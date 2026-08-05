@@ -1,0 +1,131 @@
+{
+    "language": "java",
+
+    "framework": "spring",
+
+    "database": "postgres",
+
+    "rules": {
+        "global": [
+            "rules/global/01_architecture.md",
+            "rules/global/02_api.md",
+            "rules/global/03_database.md",
+            "rules/global/04_naming.md",
+            "rules/global/05_git.md",
+            "rules/global/06_security.md",
+            "rules/global/07_logging.md",
+            "rules/global/08_error_handling.md",
+            "rules/global/09_documentation.md",
+            "rules/global/10_testing.md",
+            "rules/global/11_performance.md",
+            "rules/global/12_observability.md"
+        ],
+        "architecture": [
+            "rules/architecture/clean-architecture.md",
+            "rules/architecture/ddd.md",
+            "rules/architecture/event-driven.md",
+            "rules/architecture/microservice.md",
+            "rules/architecture/modular-monolith.md"
+        ],
+        "technology": {
+            "java": {
+                "core": [
+                    "rules/technology/java/core/java.md",
+                    "rules/technology/java/core/oop.md"
+                ],
+                "spring": [
+                    "rules/technology/java/spring/spring-boot.md",
+                    "rules/technology/java/spring/spring-data.md",
+                    "rules/technology/java/spring/spring-security.md",
+                    "rules/technology/java/spring/spring-web.md"
+                ],
+                "persistence": [
+                    "rules/technology/java/persistence/persistence.md",
+                    "rules/technology/java/persistence/migration.md"
+                ],
+                "libraries": [
+                    "rules/technology/java/libraries/libraries.md"
+                ],
+                "build": [
+                    "rules/technology/java/build/build.md"
+                ],
+                "testing": [
+                    "rules/technology/java/testing/testing.md"
+                ]
+            }
+        },
+        "infrastructure": [
+            "rules/infrastructure/docker.md",
+            "rules/infrastructure/grafana.md",
+            "rules/infrastructure/kafka.md",
+            "rules/infrastructure/kubernetes.md",
+            "rules/infrastructure/minio.md",
+            "rules/infrastructure/mongodb.md",
+            "rules/infrastructure/mysql.md",
+            "rules/infrastructure/nginx.md",
+            "rules/infrastructure/postgres.md",
+            "rules/infrastructure/prometheus.md",
+            "rules/infrastructure/rabbitmq.md",
+            "rules/infrastructure/redis.md"
+        ],
+        "templates": {
+            "java": [
+                "rules/templates/java/package.md",
+                "rules/templates/java/structure.md",
+                "rules/templates/java/controller.md",
+                "rules/templates/java/service.md",
+                "rules/templates/java/repository.md",
+                "rules/templates/java/entity.md",
+                "rules/templates/java/mapper.md",
+                "rules/templates/java/request.md",
+                "rules/templates/java/response.md",
+                "rules/templates/java/exception.md",
+                "rules/templates/java/validator.md",
+                "rules/templates/java/filter.md",
+                "rules/templates/java/interceptor.md",
+                "rules/templates/java/configuration.md",
+                "rules/templates/java/consumer.md",
+                "rules/templates/java/producer.md",
+                "rules/templates/java/event.md",
+                "rules/templates/java/scheduler.md"
+            ]
+        },
+        "docx": {
+            "java": [
+                "rules/docx/java/api-blueprint-generator.md",
+                "rules/docx/java/db-schema-generator.md"
+            ]
+        }
+    },
+
+    "workflows": [
+        "workflows/00_select_rules.md",
+        "workflows/01_read_code.md",
+        "workflows/02_understand_requirement.md",
+        "workflows/03_generate_blueprint.md",
+        "workflows/04_generate_code.md",
+        "workflows/05_review_code.md",
+        "workflows/06_refactor_code.md",
+        "workflows/07_debug_issue.md",
+        "workflows/08_generate_test.md",
+        "workflows/09_generate_documentation.md",
+        "workflows/10_design_architecture.md",
+        "workflows/11_feature_development.md",
+        "workflows/12_bug_fix.md",
+        "workflows/13_select_workflow.md",
+        "workflows/14_generate_db_schema.md"
+    ],
+
+    "scripts": {
+        "setup": {
+            "bash": "scripts/setup.sh",
+            "powershell": "scripts/setup.ps1",
+            "description": "Thêm AI-Coding repo vào project dưới dạng git submodule tại .agents/"
+        },
+        "update": {
+            "bash": "scripts/update.sh",
+            "powershell": "scripts/update.ps1",
+            "description": "Cập nhật .agents/ submodule lên phiên bản mới nhất"
+        }
+    }
+}

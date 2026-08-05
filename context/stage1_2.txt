@@ -1,0 +1,585 @@
+# result-service-stage-1-2-blueprint.md
+
+# Result Service Blueprint — Stage 1 & Stage 2
+
+## Mục tiêu
+
+Result Service là **Projection / Read Model Service** trong kiến trúc Event-driven.
+
+Service này **không tạo hoặc chấm kết quả học tập**. Nhiệm vụ của Result Service là:
+
+* Nhận sự kiện từ các source services (Examination, Practice, Lesson...)
+* Chuẩn hóa dữ liệu
+* Lưu lịch sử kết quả
+* Cập nhật projection phục vụ truy vấn nhanh
+* Cung cấp API đọc cho Dashboard, Progress và History
+
+Trong Stage 1 và Stage 2 chỉ triển khai:
+
+* Chuẩn hóa Event Contract
+* Hạ tầng Kafka Consumer
+
+Chưa xử lý ghi database.
+
+---
+
+# Stage 1 — Event Contract Design
+
+## Mục tiêu
+
+Xây dựng một **event contract thống nhất** cho toàn bộ hệ thống học tập.
+
+Tất cả source services đều publish cùng một loại event.
+
+Result Service chỉ cần consume **một event duy nhất**.
+
+---
+
+## Event Name
+
+`LEARNING_RESULT_CREATED`
+
+---
+
+## Topic
+
+`learning-results`
+
+---
+
+## Event Schema
+
+```json
+{
+  "eventId": "uuid",
+  "eventType": "LEARNING_RESULT_CREATED",
+  "eventVersion": 1,
+  "occurredAt": "2026-08-04T10:00:00Z",
+
+  "userId": "uuid",
+
+  "sourceType": "EXAM_SESSION",
+  "sourceId": "uuid",
+
+  "targetType": "EXAM",
+  "targetId": "uuid",
+
+  "attemptNo": 2,
+
+  "result": "PASSED",
+
+  "score": 88,
+  "maxScore": 100,
+  "progress": 100,
+
+  "durationSeconds": 1800,
+
+  "startedAt": "2026-08-04T09:30:00Z",
+  "completedAt": "2026-08-04T10:00:00Z",
+
+  "resultSnapshot": {
+    "correctQuestions": 34,
+    "wrongQuestions": 6,
+    "unansweredQuestions": 0,
+    "passingScore": 80,
+    "examVersionId": "uuid"
+  },
+
+  "metadata": {
+    "device": "WEB"
+  }
+}
+```
+
+---
+
+## Field Specification
+
+### Event Identity
+
+| Field        | Required | Description                     |
+| ------------ | -------- | ------------------------------- |
+| eventId      | Yes      | Unique identifier của event     |
+| eventType    | Yes      | Luôn là LEARNING_RESULT_CREATED |
+| eventVersion | Yes      | Version của event schema        |
+| occurredAt   | Yes      | Thời điểm event phát sinh       |
+
+---
+
+### User Information
+
+| Field  | Required | Description        |
+| ------ | -------- | ------------------ |
+| userId | Yes      | ID người thực hiện |
+
+---
+
+### Source Information
+
+Định danh **session hoặc attempt gốc**.
+
+| Field      | Required | Description                                                        |
+| ---------- | -------- | ------------------------------------------------------------------ |
+| sourceType | Yes      | EXAM_SESSION, PRACTICE_SESSION, LESSON_SESSION, ASSIGNMENT_SESSION |
+| sourceId   | Yes      | ID session gốc                                                     |
+
+Lưu ý: `sourceId` sẽ được dùng để **idempotent processing** ở Stage 3.
+
+---
+
+### Target Information
+
+Định danh **đối tượng học**.
+
+| Field      | Required | Description                                           |
+| ---------- | -------- | ----------------------------------------------------- |
+| targetType | Yes      | EXAM, PRACTICE_SET, CHAPTER, LESSON, LEARNING_PROGRAM |
+| targetId   | Yes      | ID đối tượng học                                      |
+
+---
+
+### Result Information
+
+| Field           | Required | Description                                   |
+| --------------- | -------- | --------------------------------------------- |
+| attemptNo       | Yes      | Lần thực hiện                                 |
+| result          | Yes      | PASSED, FAILED, COMPLETED, ABANDONED, EXPIRED |
+| score           | No       | Điểm đạt được                                 |
+| maxScore        | No       | Điểm tối đa                                   |
+| progress        | Yes      | % hoàn thành                                  |
+| durationSeconds | Yes      | Thời gian thực hiện                           |
+
+---
+
+### Time Information
+
+| Field       | Required | Description        |
+| ----------- | -------- | ------------------ |
+| startedAt   | No       | Thời điểm bắt đầu  |
+| completedAt | Yes      | Thời điểm kết thúc |
+
+---
+
+### Result Snapshot
+
+Lưu **snapshot đặc thù của source service**.
+
+Result Service **không parse hoặc validate nội dung**.
+
+Ví dụ Exam:
+
+```json
+{
+  "correctQuestions": 34,
+  "wrongQuestions": 6,
+  "examVersionId": "uuid"
+}
+```
+
+Ví dụ Lesson:
+
+```json
+{
+  "videoWatchedPercent": 100
+}
+```
+
+---
+
+### Metadata
+
+Dùng để mở rộng trong tương lai.
+
+Ví dụ:
+
+```json
+{
+  "device": "WEB",
+  "locale": "vi-VN",
+  "appVersion": "1.0.0"
+}
+```
+
+---
+
+## Validation Rules
+
+### Required Fields
+
+* eventId
+* eventType
+* eventVersion
+* occurredAt
+* userId
+* sourceType
+* sourceId
+* targetType
+* targetId
+* attemptNo
+* result
+* progress
+* durationSeconds
+* completedAt
+
+---
+
+### Numeric Validation
+
+* score >= 0
+* maxScore >= score
+* progress trong khoảng [0,100]
+* durationSeconds >= 0
+
+---
+
+### Enum Validation
+
+SourceType:
+
+* EXAM_SESSION
+* PRACTICE_SESSION
+* LESSON_SESSION
+* ASSIGNMENT_SESSION
+
+TargetType:
+
+* EXAM
+* PRACTICE_SET
+* CHAPTER
+* LESSON
+* LEARNING_PROGRAM
+
+Result:
+
+* PASSED
+* FAILED
+* COMPLETED
+* ABANDONED
+* EXPIRED
+
+Nếu enum không hợp lệ → reject event.
+
+---
+
+## Versioning Strategy
+
+### Current Version
+
+`eventVersion = 1`
+
+### Compatibility Rule
+
+* Chỉ được **thêm field mới**
+* Không được đổi tên field
+* Không được thay đổi ý nghĩa field
+* Không được xóa field cũ
+
+Result Service phải bỏ qua các field chưa biết.
+
+---
+
+## Deliverables
+
+### event/LearningResultEvent.java
+
+POJO đại diện cho event.
+
+### event/LearningResultEventValidator.java
+
+Validate toàn bộ payload.
+
+### docs/event-contract.md
+
+Tài liệu chính thức cho các source services.
+
+---
+
+# Stage 2 — Kafka Consumer Infrastructure
+
+## Mục tiêu
+
+Xây dựng **Kafka Consumer Infrastructure** để Result Service có thể nhận event một cách ổn định, retry được, và không làm mất event.
+
+Stage này **không xử lý business logic**.
+
+---
+
+## Topic Design
+
+### Topic
+
+`learning-results`
+
+### Partition Key
+
+`userId`
+
+Lý do:
+
+Đảm bảo thứ tự event của cùng một user.
+
+Ví dụ:
+
+Attempt 1
+
+Attempt 2
+
+Attempt 3
+
+luôn được consume đúng thứ tự.
+
+---
+
+## Consumer Group
+
+`result-service`
+
+Tất cả instance của Result Service sẽ thuộc cùng consumer group này.
+
+---
+
+## Kafka Flow
+
+```
+Kafka Topic
+      |
+      v
+Kafka Listener
+      |
+      v
+JSON Deserializer
+      |
+      v
+Event Validator
+      |
+      v
+Event Handler
+      |
+      v
+ACK
+```
+
+---
+
+## Package Structure
+
+```
+config/
+    KafkaConfig.java
+
+consumer/
+    LearningResultConsumer.java
+
+event/
+    LearningResultEvent.java
+    LearningResultEventValidator.java
+    LearningResultEventHandler.java
+```
+
+---
+
+## KafkaConfig
+
+### ConsumerFactory
+
+Cấu hình:
+
+* bootstrap servers
+* group id
+* JsonDeserializer
+* trusted packages
+* auto offset reset
+
+---
+
+### ListenerContainerFactory
+
+Thiết lập:
+
+* concurrency
+* ack mode
+* error handler
+* retry
+* dead letter publishing
+
+---
+
+## Retry Strategy
+
+Sử dụng **Exponential Backoff**.
+
+| Attempt | Delay     |
+| ------- | --------- |
+| 1       | 1 second  |
+| 2       | 2 seconds |
+| 3       | 5 seconds |
+
+Sau lần retry cuối cùng → Dead Letter Topic.
+
+---
+
+## Dead Letter Topic
+
+Tên:
+
+`learning-results-dlt`
+
+Tất cả event không xử lý được sẽ được publish sang DLT.
+
+Không được discard event.
+
+---
+
+## Consumer Skeleton
+
+```java
+@KafkaListener(
+    topics = "learning-results",
+    groupId = "result-service"
+)
+public void consume(LearningResultEvent event) {
+
+    validator.validate(event);
+
+    handler.handle(event);
+}
+```
+
+Trong Stage 2:
+
+`handler.handle()` chỉ **log event**.
+
+Chưa ghi database.
+
+---
+
+## Event Handler
+
+Flow:
+
+```
+Receive Event
+      |
+      v
+Validate
+      |
+      v
+Log Event
+      |
+      v
+ACK
+```
+
+Ví dụ log:
+
+```
+eventId=...
+eventType=LEARNING_RESULT_CREATED
+userId=...
+sourceType=EXAM_SESSION
+sourceId=...
+targetType=EXAM
+targetId=...
+completedAt=...
+```
+
+Không log toàn bộ resultSnapshot.
+
+---
+
+## Error Handling
+
+### Validation Error
+
+→ Publish DLT
+
+---
+
+### Deserialization Error
+
+→ Publish DLT
+
+---
+
+### Unexpected Exception
+
+Retry:
+
+1. 1s
+2. 2s
+3. 5s
+
+Nếu vẫn thất bại → DLT
+
+---
+
+## Metrics
+
+Chuẩn bị metric cho Prometheus.
+
+Counters:
+
+* events.received
+* events.processed
+* events.failed
+* events.dlt
+
+Timer:
+
+* consume.duration
+
+---
+
+## Deliverables
+
+### config/KafkaConfig.java
+
+Kafka consumer configuration.
+
+### consumer/LearningResultConsumer.java
+
+Kafka listener.
+
+### event/LearningResultEventValidator.java
+
+Schema validation.
+
+### event/LearningResultEventHandler.java
+
+Temporary logging handler.
+
+### docs/kafka-consumer.md
+
+Bao gồm:
+
+* Topic
+* Consumer Group
+* Retry
+* DLT
+* Logging
+* Metrics
+
+---
+
+# Completion Criteria
+
+## Stage 1
+
+* Event schema được chốt
+* Validation rules hoàn chỉnh
+* Versioning strategy hoàn chỉnh
+* Có tài liệu event contract
+
+## Stage 2
+
+* Kafka consumer kết nối thành công
+* Deserialize thành công
+* Validate thành công
+* Log thành công
+* ACK thành công
+* Retry hoạt động
+* DLT hoạt động
+
+Sau Stage 2, Result Service đã **sẵn sàng nhận event từ Examination Service** nhưng **chưa ghi bất kỳ dữ liệu nào vào database**.
+
+Business processing và projection sẽ được triển khai trong **Stage 3 và Stage 4**.

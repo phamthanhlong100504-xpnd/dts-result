@@ -1,0 +1,595 @@
+# result-service-stage-7-8-blueprint.md
+
+# Result Service Blueprint — Stage 7 & Stage 8
+
+## Mục tiêu
+
+Sau Stage 5 và Stage 6, Result Service đã có:
+
+* History APIs (learning_results)
+* Summary APIs (learning_summaries)
+
+Stage 7 và Stage 8 hoàn thiện:
+
+* **Dashboard / Overview APIs**
+* **Statistics APIs**
+* **Internal Service APIs**
+
+Tất cả API trong giai đoạn này là **read-only**.
+
+---
+
+# Stage 7 — Overview & Statistics APIs
+
+## Mục tiêu
+
+Cung cấp dữ liệu tổng hợp phục vụ:
+
+* Dashboard người học
+* Trang chủ ứng dụng
+* Báo cáo cá nhân
+* Biểu đồ thống kê
+
+Nguồn dữ liệu:
+
+* learning_summaries
+* learning_results
+
+---
+
+## API List
+
+### GET /v1/results/me/overview
+
+Dashboard tổng quan.
+
+### GET /v1/results/me/statistics
+
+Thống kê học tập theo thời gian.
+
+---
+
+# API 7 — Get Overview
+
+## Endpoint
+
+```text
+GET /v1/results/me/overview
+```
+
+## Authentication
+
+JWT Required
+
+User ID lấy từ Access Token.
+
+---
+
+## Business Rules
+
+Trả thông tin tổng quan của user hiện tại.
+
+Không phân trang.
+
+---
+
+## Processing Flow
+
+```text
+Controller
+     |
+     v
+OverviewService
+     |
+     +----------------------+
+     |                      |
+     v                      v
+learning_summaries    learning_results
+     |                      |
+     +----------+-----------+
+                |
+                v
+        Aggregate Response
+```
+
+---
+
+## Aggregation Rules
+
+### completedPrograms
+
+Đếm learning_summaries:
+
+* targetType = LEARNING_PROGRAM
+* status = COMPLETED
+
+### inProgressPrograms
+
+Đếm:
+
+* targetType = LEARNING_PROGRAM
+* status = IN_PROGRESS
+
+### completedLessons
+
+Đếm:
+
+* targetType = LESSON
+* status = COMPLETED
+
+### completedChapters
+
+Đếm:
+
+* targetType = CHAPTER
+* status = COMPLETED
+
+### averageScore
+
+AVG(latest_score)
+
+### bestScore
+
+MAX(best_score)
+
+### totalLearningTimeSeconds
+
+SUM(total_duration_seconds)
+
+### totalAttempts
+
+SUM(attempt_count)
+
+### lastActivityAt
+
+MAX(last_activity_at)
+
+---
+
+## Response
+
+```json
+{
+  "completedPrograms": 2,
+  "inProgressPrograms": 1,
+  "completedChapters": 12,
+  "completedLessons": 48,
+  "averageScore": 84.5,
+  "bestScore": 96,
+  "totalLearningTimeSeconds": 125400,
+  "totalAttempts": 37,
+  "lastActivityAt": "2026-08-04T10:00:00Z"
+}
+```
+
+---
+
+# API 8 — Get Statistics
+
+## Endpoint
+
+```text
+GET /v1/results/me/statistics
+```
+
+## Authentication
+
+JWT Required
+
+---
+
+## Query Parameters
+
+| Field    | Required | Description               |
+| -------- | -------- | ------------------------- |
+| from     | No       | Bắt đầu khoảng thời gian  |
+| to       | No       | Kết thúc khoảng thời gian |
+| interval | No       | DAY, WEEK, MONTH          |
+
+Default:
+
+* interval = DAY
+* from = now - 30 days
+
+---
+
+## Business Rules
+
+Trả dữ liệu phục vụ biểu đồ.
+
+Không trả toàn bộ history.
+
+---
+
+## Statistics Blocks
+
+### scoreTrend
+
+Điểm theo thời gian.
+
+```json
+{
+  "date": "2026-08-01",
+  "averageScore": 82
+}
+```
+
+### studyTimeTrend
+
+Thời gian học.
+
+```json
+{
+  "date": "2026-08-01",
+  "durationSeconds": 5400
+}
+```
+
+### attemptTrend
+
+Số lần thực hiện.
+
+```json
+{
+  "date": "2026-08-01",
+  "attempts": 5
+}
+```
+
+### completionTrend
+
+Số đối tượng hoàn thành.
+
+```json
+{
+  "date": "2026-08-01",
+  "completed": 3
+}
+```
+
+---
+
+## Response
+
+```json
+{
+  "scoreTrend": [
+    {
+      "date": "2026-08-01",
+      "averageScore": 82
+    }
+  ],
+  "studyTimeTrend": [
+    {
+      "date": "2026-08-01",
+      "durationSeconds": 5400
+    }
+  ],
+  "attemptTrend": [
+    {
+      "date": "2026-08-01",
+      "attempts": 5
+    }
+  ],
+  "completionTrend": [
+    {
+      "date": "2026-08-01",
+      "completed": 3
+    }
+  ]
+}
+```
+
+---
+
+## Repository Requirements
+
+learning_results:
+
+* completed_at
+* score
+* duration_seconds
+
+learning_summaries:
+
+* status
+* target_type
+* total_duration_seconds
+
+---
+
+## Stage 7 Deliverables
+
+### controller/OverviewController.java
+
+### service/OverviewService.java
+
+### service/StatisticsService.java
+
+### response/
+
+* OverviewResponse
+* StatisticsResponse
+* TrendItemResponse
+
+### docs/api-overview.md
+
+Bao gồm:
+
+* Endpoint
+* Aggregation rules
+* Query strategy
+* Performance considerations
+
+---
+
+# Stage 8 — Internal APIs
+
+## Mục tiêu
+
+Cung cấp API cho **service-to-service communication**.
+
+Không dùng cho frontend.
+
+Được gọi bởi:
+
+* Learning Service
+* Course Service
+* Reporting Service
+* Notification Service
+* Recommendation Service
+
+---
+
+## Authentication
+
+Không dùng JWT user.
+
+Sử dụng:
+
+* Service JWT
+* Internal Token
+* Gateway Internal Authentication
+
+---
+
+## API List
+
+### GET /internal/results/users/{userId}/overview
+
+Lấy overview của một user.
+
+### GET /internal/results/users/{userId}/summaries
+
+Lấy projection của một user.
+
+---
+
+# API 9 — Internal Overview
+
+## Endpoint
+
+```text
+GET /internal/results/users/{userId}/overview
+```
+
+## Authentication
+
+Internal Only
+
+---
+
+## Business Rules
+
+* Không kiểm tra ownership.
+* Trả overview của user bất kỳ.
+* Dùng cho admin/reporting.
+
+---
+
+## Response
+
+Giống API public.
+
+```json
+{
+  "completedPrograms": 2,
+  "completedLessons": 48,
+  "averageScore": 84.5,
+  "totalLearningTimeSeconds": 125400,
+  "lastActivityAt": "2026-08-04T10:00:00Z"
+}
+```
+
+---
+
+# API 10 — Internal Summary List
+
+## Endpoint
+
+```text
+GET /internal/results/users/{userId}/summaries
+```
+
+## Query Parameters
+
+| Field      | Required | Description                |
+| ---------- | -------- | -------------------------- |
+| targetType | No       | Filter theo loại đối tượng |
+| status     | No       | Filter theo trạng thái     |
+
+---
+
+## Business Rules
+
+* Không ownership check.
+* Dùng cho Learning Service.
+* Dùng để hiển thị progress của user.
+
+---
+
+## Response
+
+```json
+[
+  {
+    "targetType": "CHAPTER",
+    "targetId": "uuid",
+    "status": "IN_PROGRESS",
+    "progress": 60,
+    "attemptCount": 2,
+    "bestScore": 88
+  }
+]
+```
+
+---
+
+# Internal Controller Structure
+
+```text
+controller/
+    InternalResultController
+```
+
+Methods:
+
+* getUserOverview()
+* getUserSummaries()
+
+---
+
+# Error Handling
+
+## Public APIs
+
+401
+
+403
+
+404
+
+---
+
+## Internal APIs
+
+401
+
+403
+
+404
+
+Service authentication fail → 403.
+
+---
+
+# Logging
+
+Overview:
+
+```text
+userId
+endpoint
+```
+
+Statistics:
+
+```text
+userId
+from
+to
+interval
+```
+
+Internal:
+
+```text
+callerService
+userId
+endpoint
+```
+
+Không log snapshot.
+
+---
+
+# Performance Considerations
+
+## Overview
+
+Chỉ query learning_summaries.
+
+Không aggregate toàn bộ learning_results nếu không cần.
+
+---
+
+## Statistics
+
+Chỉ aggregate theo khoảng thời gian được yêu cầu.
+
+Giới hạn tối đa:
+
+* 365 ngày
+
+Nếu vượt quá:
+
+→ reject request.
+
+---
+
+## Internal APIs
+
+Được cache ngắn hạn.
+
+Ví dụ:
+
+30–60 seconds.
+
+---
+
+# Stage 7 Deliverables
+
+* OverviewController
+* OverviewService
+* StatisticsService
+* OverviewResponse
+* StatisticsResponse
+* api-overview.md
+
+---
+
+# Stage 8 Deliverables
+
+* InternalResultController
+* InternalResultService
+* InternalSummaryResponse
+* api-internal.md
+
+---
+
+# Completion Criteria
+
+## Stage 7
+
+* GET /overview hoạt động
+* GET /statistics hoạt động
+* Aggregation đúng
+* Trend calculation đúng
+* Performance < 100ms với overview
+
+## Stage 8
+
+* Internal authentication hoạt động
+* GET /internal/results/users/{id}/overview hoạt động
+* GET /internal/results/users/{id}/summaries hoạt động
+* Service-to-service integration sẵn sàng
+
+Sau Stage 8, Result Service đã cung cấp đầy đủ:
+
+* History APIs
+* Summary APIs
+* Dashboard APIs
+* Statistics APIs
+* Internal APIs
+
+và sẵn sàng bước sang Stage 9 (Hardening, Retry, DLQ, Monitoring, Performance, Integration Testing).

@@ -1,0 +1,720 @@
+# result-service-stage-3-4-blueprint.md
+
+# Result Service Blueprint — Stage 3 & Stage 4
+
+## Mục tiêu
+
+Stage 3 và Stage 4 triển khai **lõi nghiệp vụ của Result Service**.
+
+* **Stage 3:** xử lý event và lưu lịch sử vào `learning_results`.
+* **Stage 4:** cập nhật projection `learning_summaries` để phục vụ truy vấn nhanh.
+
+Kết quả sau Stage 4:
+
+* Mỗi event học tập được lưu thành **1 bản ghi lịch sử**.
+* Projection của người học được cập nhật theo thời gian thực.
+* Dashboard và Progress APIs có dữ liệu để truy vấn.
+
+---
+
+# Stage 3 — Learning Result Processing
+
+## Mục tiêu
+
+Nhận `LEARNING_RESULT_CREATED` từ Kafka và ghi **lịch sử từng lần thực hiện** vào `learning_results`.
+
+Đây là **append-only processing**.
+
+Không cập nhật record cũ.
+
+Mỗi session chỉ được lưu **một lần duy nhất**.
+
+---
+
+## Business Flow
+
+```text
+Kafka Event
+     |
+     v
+Validate Event
+     |
+     v
+Idempotent Check
+     |
+     +---- Duplicate ----> ACK
+     |
+     v
+Map Event -> LearningResult
+     |
+     v
+Save learning_results
+     |
+     v
+Trigger Summary Projection
+     |
+     v
+ACK
+```
+
+---
+
+## Idempotent Processing
+
+### Mục tiêu
+
+Kafka có thể:
+
+* retry
+* duplicate delivery
+* consumer restart
+* rebalance
+
+Result Service phải đảm bảo:
+
+**Một session chỉ tạo một learning_result duy nhất.**
+
+### Khóa idempotent
+
+```text
+(source_type, source_id)
+```
+
+Ví dụ:
+
+```text
+sourceType = EXAM_SESSION
+sourceId   = 123
+```
+
+Nếu event được gửi lại:
+
+→ bỏ qua.
+
+---
+
+## Processing Algorithm
+
+### Input
+
+`LearningResultEvent`
+
+### Output
+
+`LearningResult`
+
+### Pseudo
+
+```text
+BEGIN TRANSACTION
+
+IF exists(source_type, source_id)
+    RETURN
+
+CREATE learning_result
+
+SAVE learning_result
+
+CALL LearningSummaryService.updateProjection()
+
+COMMIT
+```
+
+---
+
+## Mapping Rules
+
+### Basic Fields
+
+| Event           | learning_results |
+| --------------- | ---------------- |
+| userId          | user_id          |
+| sourceType      | source_type      |
+| sourceId        | source_id        |
+| targetType      | target_type      |
+| targetId        | target_id        |
+| attemptNo       | attempt_no       |
+| result          | result           |
+| score           | score            |
+| maxScore        | max_score        |
+| progress        | progress         |
+| durationSeconds | duration_seconds |
+| startedAt       | started_at       |
+| completedAt     | completed_at     |
+| resultSnapshot  | result_snapshot  |
+| metadata        | metadata         |
+
+---
+
+## Validation Rules
+
+Trước khi ghi DB:
+
+### Required
+
+* userId
+* sourceType
+* sourceId
+* targetType
+* targetId
+* result
+* completedAt
+
+### Numeric
+
+* score >= 0
+* maxScore >= score
+* progress trong [0,100]
+* durationSeconds >= 0
+
+Nếu validation fail:
+
+→ reject event.
+
+---
+
+## Transaction Boundary
+
+Toàn bộ Stage 3 chạy trong **một transaction**.
+
+```text
+Insert learning_results
+
++
+
+Update learning_summaries
+```
+
+Nếu projection fail:
+
+→ rollback.
+
+Không được tồn tại history mà projection không cập nhật.
+
+---
+
+## Service Structure
+
+```text
+consumer/
+    LearningResultConsumer
+
+service/
+    LearningResultService
+
+repository/
+    LearningResultRepository
+```
+
+---
+
+## LearningResultService
+
+### Public Method
+
+```java
+void processLearningResult(LearningResultEvent event)
+```
+
+### Internal Steps
+
+1. Validate event
+2. Check duplicate
+3. Map entity
+4. Save learning_result
+5. Call projection service
+
+---
+
+## Repository Methods
+
+```text
+existsBySourceTypeAndSourceId()
+
+save()
+
+findById()
+```
+
+---
+
+## Logging
+
+Log tối thiểu:
+
+```text
+eventId
+userId
+sourceType
+sourceId
+targetType
+targetId
+attemptNo
+result
+```
+
+Không log toàn bộ resultSnapshot.
+
+---
+
+## Deliverables
+
+### consumer/LearningResultConsumer.java
+
+Kafka listener.
+
+### service/LearningResultService.java
+
+Business processing.
+
+### mapper/LearningResultMapper.java
+
+Event → Entity.
+
+### repository/LearningResultRepository.java
+
+Persistence layer.
+
+### docs/learning-result-processing.md
+
+Business flow và idempotent strategy.
+
+---
+
+# Stage 4 — Summary Projection Engine
+
+## Mục tiêu
+
+Duy trì **projection hiện tại của người học** trong `learning_summaries`.
+
+Projection được cập nhật **mỗi khi có learning_result mới**.
+
+---
+
+## Projection Principle
+
+### learning_results
+
+Lưu lịch sử.
+
+### learning_summaries
+
+Lưu trạng thái hiện tại.
+
+Ví dụ:
+
+```text
+User A
+Exam X
+
+Attempt 1 → 70
+Attempt 2 → 80
+Attempt 3 → 90
+```
+
+learning_results:
+
+3 records.
+
+learning_summaries:
+
+1 record.
+
+---
+
+## Projection Flow
+
+```text
+LearningResult Saved
+        |
+        v
+Find Summary
+        |
+        +---- Not Found ----+
+        |                   |
+        v                   v
+Create Summary        Update Summary
+        |
+        v
+Save Summary
+```
+
+---
+
+## Create Projection
+
+Nếu chưa có summary:
+
+Tạo mới với:
+
+```text
+attempt_count          = 1
+
+completion_count       = result là PASSED/COMPLETED ? 1 : 0
+
+best_score             = score
+
+latest_score           = score
+
+average_score          = score
+
+progress               = progress
+
+status                 = deriveStatus(progress)
+
+total_duration_seconds = duration
+
+last_result_id         = result.id
+
+last_activity_at       = completedAt
+
+completed_at           = progress == 100 ? completedAt : null
+
+summary_snapshot       = deriveSnapshot()
+
+metadata               = event.metadata
+```
+
+---
+
+## Update Projection
+
+Nếu đã tồn tại summary.
+
+### attempt_count
+
+```text
+old + 1
+```
+
+---
+
+### completion_count
+
+Nếu result:
+
+* PASSED
+* COMPLETED
+
+thì +1.
+
+---
+
+### best_score
+
+```text
+max(oldBest, newScore)
+```
+
+---
+
+### latest_score
+
+```text
+= newScore
+```
+
+---
+
+### average_score
+
+```text
+((oldAverage * oldAttempts) + newScore)
+    / newAttempts
+```
+
+Không query toàn bộ history.
+
+Tính incremental.
+
+---
+
+### progress
+
+```text
+max(oldProgress, newProgress)
+```
+
+Không giảm progress.
+
+---
+
+### status
+
+```text
+progress == 0
+    NOT_STARTED
+
+0 < progress < 100
+    IN_PROGRESS
+
+progress == 100
+    COMPLETED
+```
+
+---
+
+### total_duration_seconds
+
+```text
+old + duration
+```
+
+---
+
+### last_result_id
+
+```text
+= currentResultId
+```
+
+---
+
+### last_activity_at
+
+```text
+= completedAt
+```
+
+---
+
+### completed_at
+
+Chỉ set khi:
+
+```text
+status chuyển sang COMPLETED
+```
+
+Nếu đã completed trước đó:
+
+giữ nguyên.
+
+---
+
+## Summary Snapshot
+
+Projection snapshot hiện tại.
+
+Ví dụ Exam:
+
+```json
+{
+  "passed": true,
+  "bestAttemptNo": 3
+}
+```
+
+Ví dụ Learning Program:
+
+```json
+{
+  "completedLessons": 48,
+  "totalLessons": 60
+}
+```
+
+Projection service có thể derive snapshot từ:
+
+* result
+* progress
+* score
+* event snapshot
+
+---
+
+## Upsert Strategy
+
+Sử dụng PostgreSQL:
+
+```sql
+INSERT ...
+ON CONFLICT (user_id, target_type, target_id)
+DO UPDATE SET ...
+```
+
+Không:
+
+```text
+SELECT
+
+IF
+
+UPDATE
+```
+
+để tránh race condition.
+
+---
+
+## Concurrency
+
+Có thể có nhiều event cùng lúc.
+
+Ví dụ:
+
+Attempt 2
+
+Attempt 3
+
+Projection phải an toàn.
+
+Sử dụng:
+
+* transaction
+* upsert
+* row-level locking của PostgreSQL
+
+Không dùng synchronized trong application.
+
+---
+
+## Service Structure
+
+```text
+service/
+    LearningSummaryService
+
+repository/
+    LearningSummaryRepository
+```
+
+---
+
+## LearningSummaryService
+
+### Public Method
+
+```java
+void updateProjection(LearningResult result)
+```
+
+### Internal Steps
+
+1. Find existing summary
+2. Create hoặc Update
+3. Recalculate fields
+4. Save projection
+
+---
+
+## Repository Methods
+
+```text
+findByUserIdAndTarget()
+
+save()
+
+upsert()
+```
+
+---
+
+## Projection Algorithm
+
+```text
+IF summary == null
+
+    create summary
+
+ELSE
+
+    attempt_count++
+
+    IF completed
+        completion_count++
+
+    best_score =
+        max(best_score, score)
+
+    latest_score =
+        score
+
+    average_score =
+        incrementalAverage()
+
+    progress =
+        max(progress, newProgress)
+
+    status =
+        deriveStatus()
+
+    total_duration_seconds += duration
+
+    last_result_id =
+        currentResultId
+
+    last_activity_at =
+        completedAt
+
+    completed_at =
+        updateIfNeeded()
+
+    summary_snapshot =
+        deriveSnapshot()
+
+SAVE summary
+```
+
+---
+
+## Logging
+
+Log:
+
+```text
+userId
+targetType
+targetId
+attemptCount
+bestScore
+latestScore
+status
+```
+
+---
+
+## Deliverables
+
+### service/LearningSummaryService.java
+
+Projection engine.
+
+### repository/LearningSummaryRepository.java
+
+Persistence layer.
+
+### mapper/LearningSummaryMapper.java
+
+Entity mapping.
+
+### docs/summary-projection.md
+
+Projection algorithm và update rules.
+
+---
+
+# Completion Criteria
+
+## Stage 3
+
+* Kafka event được xử lý
+* Duplicate event không tạo record mới
+* learning_results được insert thành công
+* Transaction hoạt động
+* Logging đầy đủ
+
+## Stage 4
+
+* Projection được tạo khi chưa tồn tại
+* Projection được cập nhật khi đã tồn tại
+* attempt_count đúng
+* best_score đúng
+* latest_score đúng
+* average_score đúng
+* progress đúng
+* status đúng
+* completed_at đúng
+* summary_snapshot đúng
+
+Sau Stage 4, Result Service đã có **lịch sử đầy đủ và projection hoàn chỉnh**, sẵn sàng triển khai các REST APIs ở Stage 5 và Stage 6.

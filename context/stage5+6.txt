@@ -1,0 +1,753 @@
+# result-service-stage-5-6-blueprint.md
+
+# Result Service Blueprint — Stage 5 & Stage 6
+
+## Mục tiêu
+
+Sau Stage 3 và Stage 4, Result Service đã hoàn thành:
+
+* Kafka Consumer
+* Xử lý learning_results
+* Projection learning_summaries
+
+Stage 5 và Stage 6 triển khai **REST APIs phục vụ frontend và các service khác**.
+
+* **Stage 5:** History APIs (Attempt History)
+* **Stage 6:** Summary / Progress APIs (Projection Read Model)
+
+Tất cả API trong giai đoạn này là **read-only**.
+
+Result Service **không có API ghi dữ liệu**.
+
+---
+
+# Stage 5 — History APIs
+
+## Mục tiêu
+
+Cung cấp API truy vấn **lịch sử học tập / lịch sử làm bài** của người dùng.
+
+Nguồn dữ liệu:
+
+`learning_results`
+
+Mỗi record tương ứng với **một lần thực hiện (attempt)**.
+
+---
+
+## API List
+
+### GET /v1/results/me/history
+
+Lấy danh sách lịch sử thực hiện.
+
+### GET /v1/results/me/history/{resultId}
+
+Lấy chi tiết một lần thực hiện.
+
+### GET /v1/results/me/recent
+
+Lấy hoạt động gần đây.
+
+---
+
+# API 1 — Get History List
+
+## Endpoint
+
+```text
+GET /v1/results/me/history
+```
+
+## Authentication
+
+JWT Required
+
+User ID được lấy từ Access Token.
+
+Không nhận userId từ client.
+
+---
+
+## Query Parameters
+
+| Field      | Required | Description                                   |
+| ---------- | -------- | --------------------------------------------- |
+| targetType | No       | EXAM, CHAPTER, LESSON, LEARNING_PROGRAM       |
+| targetId   | No       | ID đối tượng học                              |
+| result     | No       | PASSED, FAILED, COMPLETED, ABANDONED, EXPIRED |
+| from       | No       | Thời gian bắt đầu                             |
+| to         | No       | Thời gian kết thúc                            |
+| page       | No       | Default = 0                                   |
+| size       | No       | Default = 20                                  |
+| sort       | No       | Default = completedAt,desc                    |
+
+---
+
+## Business Rules
+
+* Chỉ trả dữ liệu của user hiện tại.
+* Có thể filter theo targetType.
+* Có thể filter theo targetId.
+* Có thể filter theo result.
+* Có thể filter theo khoảng thời gian.
+* Có phân trang.
+* Kết quả được sắp xếp theo `completedAt DESC`.
+
+---
+
+## Processing Flow
+
+```text
+Controller
+     |
+     v
+HistoryService
+     |
+     v
+LearningResultRepository
+     |
+     v
+learning_results
+```
+
+---
+
+## Repository Query
+
+Filter theo:
+
+* user_id
+* target_type
+* target_id
+* result
+* completed_at
+
+Order:
+
+`completed_at DESC`
+
+---
+
+## Response
+
+```json
+{
+  "content": [
+    {
+      "id": "uuid",
+      "targetType": "EXAM",
+      "targetId": "uuid",
+      "attemptNo": 3,
+      "result": "PASSED",
+      "score": 92,
+      "maxScore": 100,
+      "progress": 100,
+      "durationSeconds": 1800,
+      "completedAt": "2026-08-04T10:00:00Z"
+    }
+  ],
+  "page": 0,
+  "size": 20,
+  "totalElements": 35,
+  "totalPages": 2
+}
+```
+
+---
+
+# API 2 — Get History Detail
+
+## Endpoint
+
+```text
+GET /v1/results/me/history/{resultId}
+```
+
+## Authentication
+
+JWT Required
+
+---
+
+## Business Rules
+
+* User chỉ được xem kết quả của chính mình.
+* Nếu không tồn tại → 404.
+* Nếu không thuộc user → 404.
+
+---
+
+## Processing Flow
+
+```text
+Controller
+     |
+     v
+HistoryService
+     |
+     v
+Repository.findById()
+     |
+     v
+Ownership Check
+```
+
+---
+
+## Response
+
+```json
+{
+  "id": "uuid",
+  "targetType": "EXAM",
+  "targetId": "uuid",
+  "attemptNo": 3,
+  "result": "PASSED",
+  "score": 92,
+  "maxScore": 100,
+  "progress": 100,
+  "durationSeconds": 1800,
+  "startedAt": "2026-08-04T09:30:00Z",
+  "completedAt": "2026-08-04T10:00:00Z",
+  "resultSnapshot": {
+    "correctQuestions": 34,
+    "wrongQuestions": 6,
+    "unansweredQuestions": 0,
+    "passingScore": 80
+  },
+  "metadata": {
+    "device": "WEB"
+  }
+}
+```
+
+---
+
+# API 3 — Get Recent Activities
+
+## Endpoint
+
+```text
+GET /v1/results/me/recent
+```
+
+## Query Parameters
+
+| Field | Required | Description  |
+| ----- | -------- | ------------ |
+| limit | No       | Default = 10 |
+
+---
+
+## Business Rules
+
+* Trả các hoạt động gần nhất.
+* Order theo `completedAt DESC`.
+* Không phân trang.
+
+---
+
+## Processing
+
+```text
+Find learning_results
+
+user_id = currentUser
+
+ORDER BY completed_at DESC
+
+LIMIT limit
+```
+
+---
+
+## Response
+
+```json
+[
+  {
+    "targetType": "EXAM",
+    "targetId": "uuid",
+    "result": "PASSED",
+    "score": 92,
+    "completedAt": "2026-08-04T10:00:00Z"
+  }
+]
+```
+
+---
+
+# Stage 5 Deliverables
+
+## Controllers
+
+* HistoryController
+
+## Services
+
+* HistoryService
+
+## Repository
+
+* LearningResultRepository
+
+## Responses
+
+* HistoryItemResponse
+* HistoryDetailResponse
+* RecentActivityResponse
+
+## Documentation
+
+* api-history.md
+
+---
+
+# Stage 6 — Summary / Progress APIs
+
+## Mục tiêu
+
+Cung cấp API truy vấn **projection hiện tại của người học**.
+
+Nguồn dữ liệu:
+
+`learning_summaries`
+
+Đây là API được frontend gọi nhiều nhất.
+
+Phục vụ:
+
+* Danh sách đề thi
+* Danh sách chapter
+* Danh sách lesson
+* Danh sách learning program
+* Progress bar
+* Resume learning
+* Dashboard progress
+
+---
+
+## API List
+
+### GET /v1/results/me/summaries
+
+Danh sách projection.
+
+### GET /v1/results/me/summaries/{targetType}/{targetId}
+
+Chi tiết projection.
+
+### GET /v1/results/me/summaries/status
+
+Thống kê theo trạng thái.
+
+### GET /v1/results/me/summaries/progress
+
+Tiến độ theo loại đối tượng.
+
+### GET /v1/results/me/summaries/resume
+
+Đối tượng học cần tiếp tục.
+
+---
+
+# API 4 — Get Summary List
+
+## Endpoint
+
+```text
+GET /v1/results/me/summaries
+```
+
+## Authentication
+
+JWT Required
+
+---
+
+## Query Parameters
+
+| Field      | Required | Description                             |
+| ---------- | -------- | --------------------------------------- |
+| targetType | No       | EXAM, CHAPTER, LESSON, LEARNING_PROGRAM |
+| status     | No       | NOT_STARTED, IN_PROGRESS, COMPLETED     |
+| page       | No       | Default = 0                             |
+| size       | No       | Default = 20                            |
+| sort       | No       | Default = lastActivityAt,desc           |
+
+---
+
+## Business Rules
+
+* Chỉ trả projection của user hiện tại.
+* Có thể filter theo targetType.
+* Có thể filter theo status.
+* Có phân trang.
+* Không truy vấn learning_results.
+
+---
+
+## Processing Flow
+
+```text
+Controller
+     |
+     v
+SummaryService
+     |
+     v
+LearningSummaryRepository
+     |
+     v
+learning_summaries
+```
+
+---
+
+## Response
+
+```json
+{
+  "content": [
+    {
+      "targetType": "EXAM",
+      "targetId": "uuid",
+      "status": "COMPLETED",
+      "attemptCount": 3,
+      "bestScore": 92,
+      "latestScore": 88,
+      "averageScore": 86.7,
+      "progress": 100,
+      "lastActivityAt": "2026-08-04T10:00:00Z"
+    }
+  ],
+  "page": 0,
+  "size": 20,
+  "totalElements": 12,
+  "totalPages": 1
+}
+```
+
+---
+
+# API 5 — Get Summary Detail
+
+## Endpoint
+
+```text
+GET /v1/results/me/summaries/{targetType}/{targetId}
+```
+
+## Business Rules
+
+* Chỉ trả projection của user hiện tại.
+* Nếu chưa có summary → 404.
+* Không query learning_results.
+
+---
+
+## Response
+
+```json
+{
+  "targetType": "EXAM",
+  "targetId": "uuid",
+  "status": "COMPLETED",
+  "attemptCount": 3,
+  "completionCount": 3,
+  "bestScore": 92,
+  "latestScore": 88,
+  "averageScore": 86.7,
+  "progress": 100,
+  "totalDurationSeconds": 5400,
+  "lastActivityAt": "2026-08-04T10:00:00Z",
+  "completedAt": "2026-08-04T10:00:00Z",
+  "summarySnapshot": {
+    "passed": true,
+    "bestAttemptNo": 3
+  },
+  "metadata": {}
+}
+```
+
+---
+
+# API 6 — Get Status Statistics
+
+## Endpoint
+
+```text
+GET /v1/results/me/summaries/status
+```
+
+## Business Rules
+
+Đếm projection theo trạng thái.
+
+---
+
+## Processing
+
+Aggregate từ `learning_summaries`.
+
+---
+
+## Response
+
+```json
+{
+  "completed": 12,
+  "inProgress": 3,
+  "notStarted": 20
+}
+```
+
+---
+
+# API 7 — Get Progress by Target Type
+
+## Endpoint
+
+```text
+GET /v1/results/me/summaries/progress
+```
+
+## Query Parameters
+
+| Field      | Required | Description                             |
+| ---------- | -------- | --------------------------------------- |
+| targetType | No       | EXAM, CHAPTER, LESSON, LEARNING_PROGRAM |
+
+---
+
+## Business Rules
+
+Tính progress theo loại đối tượng.
+
+Ví dụ:
+
+* Lesson completion
+* Chapter completion
+* Program completion
+
+---
+
+## Processing
+
+```text
+Find summaries
+
+target_type = targetType
+
+Aggregate:
+
+total
+
+completed
+
+inProgress
+
+notStarted
+
+averageProgress
+```
+
+---
+
+## Response
+
+```json
+{
+  "targetType": "LEARNING_PROGRAM",
+  "total": 5,
+  "completed": 2,
+  "inProgress": 2,
+  "notStarted": 1,
+  "completionRate": 40.0,
+  "averageProgress": 68.5
+}
+```
+
+---
+
+# API 8 — Get Resume Target
+
+## Endpoint
+
+```text
+GET /v1/results/me/summaries/resume
+```
+
+## Business Rules
+
+Trả đối tượng học nên tiếp tục.
+
+Ưu tiên:
+
+1. status = IN_PROGRESS
+2. lastActivityAt DESC
+3. progress DESC
+
+Nếu không có đối tượng đang học:
+
+→ trả null.
+
+---
+
+## Processing
+
+```text
+Find summaries
+
+status = IN_PROGRESS
+
+ORDER BY
+
+lastActivityAt DESC,
+
+progress DESC
+
+LIMIT 1
+```
+
+---
+
+## Response
+
+```json
+{
+  "targetType": "LESSON",
+  "targetId": "uuid",
+  "progress": 65,
+  "lastActivityAt": "2026-08-04T10:00:00Z"
+}
+```
+
+---
+
+# Summary Service Structure
+
+```text
+controller/
+    SummaryController
+
+service/
+    SummaryService
+
+repository/
+    LearningSummaryRepository
+
+response/
+    SummaryItemResponse
+    SummaryDetailResponse
+    SummaryStatusResponse
+    ProgressResponse
+    ResumeResponse
+```
+
+---
+
+# Shared Components
+
+## Authentication
+
+Tất cả API `/v1/results/me/**`
+
+Yêu cầu:
+
+* JWT Access Token
+* User ID lấy từ token
+
+Không nhận userId từ client.
+
+---
+
+## Error Response
+
+Format thống nhất.
+
+```json
+{
+  "timestamp": "2026-08-04T10:00:00Z",
+  "status": 404,
+  "error": "NOT_FOUND",
+  "message": "Learning summary not found"
+}
+```
+
+---
+
+## Pagination
+
+Sử dụng Spring Page.
+
+Response:
+
+* content
+* page
+* size
+* totalElements
+* totalPages
+
+---
+
+## Logging
+
+History APIs:
+
+```text
+userId
+endpoint
+targetType
+targetId
+resultId
+```
+
+Summary APIs:
+
+```text
+userId
+endpoint
+targetType
+targetId
+status
+```
+
+Không log snapshot.
+
+---
+
+# Completion Criteria
+
+## Stage 5
+
+* GET /history hoạt động
+* GET /history/{id} hoạt động
+* GET /recent hoạt động
+* Pagination đúng
+* Filtering đúng
+* Ownership check đúng
+
+## Stage 6
+
+* GET /summaries hoạt động
+* GET /summaries/{target} hoạt động
+* GET /summaries/status hoạt động
+* GET /summaries/progress hoạt động
+* GET /summaries/resume hoạt động
+* Projection query đúng
+* Status aggregation đúng
+* Resume logic đúng
+
+Sau Stage 6, Result Service cung cấp đầy đủ **History APIs và Progress/Summary APIs**, đủ để frontend xây các màn hình:
+
+* Lịch sử làm bài
+* Chi tiết kết quả
+* Danh sách đề thi
+* Danh sách chapter
+* Danh sách lesson
+* Danh sách learning program
+* Progress theo từng đối tượng học
+* Resume learning
+* Dashboard progress.

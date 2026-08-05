@@ -1,0 +1,566 @@
+# result-service-stage-9-blueprint.md
+
+# Result Service Blueprint — Stage 9 (Reliability & Production Readiness)
+
+## Mục tiêu
+
+Sau Stage 1 → Stage 8, Result Service đã hoàn thành:
+
+* Kafka Consumer
+* learning_results
+* learning_summaries
+* Projection Engine
+* History APIs
+* Summary APIs
+* Overview APIs
+* Internal APIs
+
+Stage 9 tập trung vào **độ tin cậy (Reliability), khả năng vận hành (Operations) và khả năng phục hồi (Recovery)**.
+
+Mục tiêu cuối cùng:
+
+* Không mất event
+* Không ghi trùng dữ liệu
+* Có thể retry an toàn
+* Có thể giám sát
+* Có thể khôi phục khi lỗi
+* Có thể triển khai nhiều instance
+
+---
+
+# Phạm vi Stage 9
+
+Bao gồm:
+
+* Kafka Retry
+* Dead Letter Topic (DLT)
+* Idempotent Processing
+* Transaction Management
+* Error Handling
+* Logging
+* Monitoring
+* Health Check
+* Integration Testing
+* Graceful Shutdown
+
+---
+
+# Kafka Reliability
+
+## Mục tiêu
+
+Đảm bảo event không bị mất khi xảy ra lỗi.
+
+---
+
+## Retry Strategy
+
+Result Service phải retry khi gặp lỗi tạm thời.
+
+Ví dụ:
+
+* PostgreSQL mất kết nối
+* Deadlock
+* Timeout
+* Network issue
+
+Retry sử dụng **Exponential Backoff**.
+
+| Attempt | Delay     |
+| ------- | --------- |
+| 1       | 1 second  |
+| 2       | 2 seconds |
+| 3       | 5 seconds |
+
+Sau lần retry cuối cùng:
+
+→ chuyển sang Dead Letter Topic.
+
+---
+
+## Dead Letter Topic
+
+### Topic
+
+```text
+learning-results-dlt
+```
+
+DLT lưu các event không thể xử lý.
+
+Không được discard event.
+
+---
+
+## DLT Consumer
+
+Tạo consumer riêng.
+
+Nhiệm vụ:
+
+* Log event lỗi
+* Gửi cảnh báo
+* Hỗ trợ replay thủ công
+
+Flow:
+
+```text
+Main Topic
+     |
+     v
+Consumer
+     |
+     +------ Success ------> ACK
+     |
+     +------ Fail ---------> Retry
+                             |
+                             +------ Fail ---------> DLT
+```
+
+---
+
+# Idempotent Processing
+
+## Mục tiêu
+
+Kafka có thể gửi cùng một event nhiều lần.
+
+Result Service phải xử lý **đúng một lần**.
+
+---
+
+## Idempotent Key
+
+Sử dụng:
+
+```text
+(source_type, source_id)
+```
+
+Flow:
+
+```text
+Receive Event
+     |
+     v
+Check Existing
+     |
+     +------ Exists ------> ACK
+     |
+     +------ Not Exists --> Process
+```
+
+Nếu event đã được xử lý trước đó:
+
+→ bỏ qua.
+
+---
+
+# Transaction Management
+
+## Mục tiêu
+
+Lịch sử và projection phải luôn nhất quán.
+
+---
+
+## Transaction Boundary
+
+Trong cùng một transaction:
+
+```text
+Insert learning_results
+
++
+
+Update learning_summaries
+```
+
+Nếu projection update thất bại:
+
+→ rollback toàn bộ.
+
+Không được tồn tại:
+
+* learning_results có
+* learning_summaries chưa cập nhật
+
+---
+
+# Error Handling
+
+## Error Categories
+
+### Validation Error
+
+Ví dụ:
+
+* thiếu userId
+* enum không hợp lệ
+* progress > 100
+
+Xử lý:
+
+* Không retry
+* Chuyển DLT
+
+---
+
+### Business Error
+
+Ví dụ:
+
+* target không hợp lệ
+* dữ liệu không nhất quán
+
+Xử lý:
+
+* Không retry
+* Chuyển DLT
+
+---
+
+### Infrastructure Error
+
+Ví dụ:
+
+* PostgreSQL timeout
+* Kafka timeout
+* Network failure
+
+Xử lý:
+
+* Retry
+* Sau retry → DLT
+
+---
+
+# Logging Strategy
+
+## Mục tiêu
+
+Có thể trace toàn bộ vòng đời của một event.
+
+---
+
+## Correlation ID
+
+Mọi log phải chứa:
+
+* eventId
+* userId
+* sourceType
+* sourceId
+* targetType
+* targetId
+
+Ví dụ:
+
+```text
+eventId=...
+userId=...
+sourceType=EXAM_SESSION
+sourceId=...
+targetType=EXAM
+targetId=...
+```
+
+---
+
+## Log Levels
+
+### INFO
+
+* Event received
+* History saved
+* Projection updated
+* API accessed
+
+### WARN
+
+* Duplicate event
+* Validation warning
+* Retry started
+
+### ERROR
+
+* Database failure
+* Kafka failure
+* Projection failure
+* DLT published
+
+Không log toàn bộ snapshot JSON.
+
+---
+
+# Monitoring
+
+## Health Check
+
+Expose Actuator:
+
+```text
+/actuator/health
+```
+
+Bao gồm:
+
+* Application
+* PostgreSQL
+* Kafka
+
+---
+
+## Readiness Check
+
+Service chỉ READY khi:
+
+* PostgreSQL kết nối được
+* Kafka kết nối được
+* Consumer đã subscribe topic
+
+---
+
+## Liveness Check
+
+Chỉ kiểm tra:
+
+* JVM
+* Application thread
+
+---
+
+# Metrics
+
+Theo dõi các metric chính.
+
+## Kafka
+
+* events.received
+* events.processed
+* events.failed
+* events.retried
+* events.dlt
+
+## Projection
+
+* projection.created
+* projection.updated
+* projection.failed
+
+## APIs
+
+* api.history.count
+* api.summary.count
+* api.overview.count
+
+---
+
+# Integration Testing
+
+## Kafka Consumer Test
+
+### Case 1 — Valid Event
+
+Input:
+
+LEARNING_RESULT_CREATED
+
+Expected:
+
+* learning_results được tạo
+* learning_summaries được cập nhật
+
+---
+
+### Case 2 — Duplicate Event
+
+Gửi cùng event hai lần.
+
+Expected:
+
+* Chỉ một learning_result
+* Summary không tăng attemptCount
+
+---
+
+### Case 3 — Invalid Event
+
+Ví dụ:
+
+progress = 120
+
+Expected:
+
+* Validation fail
+* DLT
+
+---
+
+### Case 4 — Database Failure
+
+Giả lập PostgreSQL unavailable.
+
+Expected:
+
+* Retry
+* Rollback
+* Sau retry → DLT
+
+---
+
+# API Integration Testing
+
+## History APIs
+
+Kiểm tra:
+
+* Pagination
+* Filtering
+* Ownership
+* Sorting
+
+---
+
+## Summary APIs
+
+Kiểm tra:
+
+* Projection tồn tại
+* Projection không tồn tại
+* Status aggregation
+
+---
+
+## Overview APIs
+
+Kiểm tra:
+
+* Aggregation chính xác
+* Total duration
+* Average score
+* Completion count
+
+---
+
+# Graceful Shutdown
+
+## Mục tiêu
+
+Khi deploy hoặc restart:
+
+* Không mất event
+* Không xử lý dở transaction
+
+Flow:
+
+```text
+SIGTERM
+   |
+   v
+Stop polling Kafka
+   |
+   v
+Finish current message
+   |
+   v
+Commit offset
+   |
+   v
+Shutdown
+```
+
+---
+
+# Configuration
+
+Tất cả cấu hình phải externalize.
+
+Ví dụ:
+
+```text
+kafka.topic.learning-results
+kafka.topic.learning-results-dlt
+kafka.consumer.group
+kafka.retry.max-attempts
+kafka.retry.initial-delay
+kafka.retry.multiplier
+api.page.default-size
+api.page.max-size
+```
+
+Không hard-code trong source.
+
+---
+
+# Operational Checklist
+
+Trước khi deploy production:
+
+* Kafka topic tồn tại
+* DLT topic tồn tại
+* PostgreSQL migration thành công
+* Consumer subscribe thành công
+* Health endpoint hoạt động
+* Retry hoạt động
+* DLT hoạt động
+* Duplicate event test pass
+* Transaction rollback test pass
+* Graceful shutdown test pass
+
+---
+
+# Deliverables
+
+## Config
+
+* KafkaConfig
+* RetryConfig
+* ActuatorConfig
+
+## Consumer
+
+* LearningResultConsumer
+* LearningResultDltConsumer
+
+## Service
+
+* Retry handler
+* Error handler
+* Transaction management
+
+## Monitoring
+
+* Health endpoint
+* Metrics endpoint
+* Logging configuration
+
+## Test
+
+* Kafka integration tests
+* API integration tests
+* Transaction rollback tests
+* Duplicate event tests
+
+## Documentation
+
+* operations.md
+* troubleshooting.md
+* deployment-checklist.md
+
+---
+
+# Completion Criteria
+
+Stage 9 được xem là hoàn thành khi:
+
+* Retry hoạt động đúng
+* DLT hoạt động đúng
+* Duplicate event không tạo dữ liệu trùng
+* Transaction rollback hoạt động
+* Health check phản ánh đúng trạng thái service
+* Logging có thể trace toàn bộ event
+* Integration tests pass
+* Service có thể restart mà không mất event
+
+Sau Stage 9, Result Service đạt trạng thái **Production Ready** và có thể triển khai trong môi trường microservices sử dụng Kafka, PostgreSQL và nhiều instance chạy song song.

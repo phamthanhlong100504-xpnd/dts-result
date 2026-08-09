@@ -1,0 +1,15 @@
+services:
+  dts-result:
+    image: ghcr.io/${GITHUB_OWNER}/dts-result:latest
+    container_name: dts-result
+    restart: unless-stopped
+    ports: ["8086:8080"]
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://dts-postgres:5432/dts_result_db
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: dts-kafka:9092
+    networks: [dts-network]
+
+networks:
+  dts-network: { external: true }

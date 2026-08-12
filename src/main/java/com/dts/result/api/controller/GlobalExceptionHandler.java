@@ -57,6 +57,18 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(errorResponse);
     }
 
+    @ExceptionHandler(com.dts.result.api.exception.ResourceNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleResourceNotFoundException(com.dts.result.api.exception.ResourceNotFoundException ex, HttpServletRequest request) {
+        log.warn("Resource not found: {}", ex.getMessage());
+        ErrorResponse errorResponse = new ErrorResponse(
+                "RES-404-001",
+                ex.getMessage(),
+                List.of(),
+                getTraceId(request)
+        );
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorResponse);
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleGenericException(Exception ex, HttpServletRequest request) {
         log.error("Unhandled exception occurred", ex);

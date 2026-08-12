@@ -26,7 +26,7 @@ public class LearningResultConsumer {
             dltStrategy = DltStrategy.FAIL_ON_ERROR,
             exclude = {ValidationException.class, BusinessException.class}
     )
-    @KafkaListener(topics = "${kafka.topic.learning-results}", groupId = "${kafka.consumer.group-id}")
+    @KafkaListener(topics = "${spring.kafka.topic.learning-results}", groupId = "${spring.kafka.consumer.group-id}")
     public void consume(LearningResultEvent event) {
         try {
             // Setup MDC for log correlation

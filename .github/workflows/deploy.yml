@@ -54,11 +54,12 @@ jobs:
           DB_HOST: ${{ secrets.DB_HOST }}
           DB_PORT: ${{ secrets.DB_PORT }}
           DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          KAFKA_HOST: ${{ secrets.KAFKA_HOST }}
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           password: ${{ secrets.VPS_PASSWORD }}
-          envs: DB_HOST,DB_PORT,DB_PASSWORD
+          envs: DB_HOST,DB_PORT,DB_PASSWORD,KAFKA_HOST
           script: |
             cd ${{ env.DEPLOY_DIR }}
             mv -f docker-compose.prod.yml docker-compose.yml
@@ -67,5 +68,6 @@ jobs:
             echo "DB_HOST=$DB_HOST" > .env
             echo "DB_PORT=$DB_PORT" >> .env
             echo "DB_PASSWORD=$DB_PASSWORD" >> .env
+            echo "KAFKA_HOST=$KAFKA_HOST" >> .env
             docker compose pull
             docker compose up -d

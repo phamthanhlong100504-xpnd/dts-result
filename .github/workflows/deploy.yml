@@ -19,10 +19,14 @@ jobs:
       - uses: actions/checkout@v4
       
       - uses: actions/setup-java@v4
-        with: { distribution: temurin, java-version: 21 }
+        with:
+          distribution: 'temurin'
+          java-version: '21'
 
       - uses: actions/cache@v4
-        with: { path: ~/.m2/repository, key: '${{ runner.os }}-maven-${{ hashFiles("**/pom.xml") }}' }
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
       
       - run: ./mvnw clean package -B -DskipTests
 

@@ -8,8 +8,11 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://${DB_HOST}:${DB_PORT:-5432}/dts_result_db
       SPRING_DATASOURCE_USERNAME: postgres
       SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
-      SPRING_KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_HOST:-media-kafka}:9092
-    networks: [dts-network]
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_HOST:-kafka}:9092
+    networks:
+      - dts-network
+      - dts-media_default
 
 networks:
   dts-network: { external: true }
+  dts-media_default: { external: true }

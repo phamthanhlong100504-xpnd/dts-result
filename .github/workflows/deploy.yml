@@ -59,6 +59,7 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           password: ${{ secrets.VPS_PASSWORD }}
+          timeout: 30m
           envs: DB_HOST,DB_PORT,DB_PASSWORD,KAFKA_HOST
           script: |
             cd ${{ env.DEPLOY_DIR }}
@@ -69,5 +70,6 @@ jobs:
             echo "DB_PORT=$DB_PORT" >> .env
             echo "DB_PASSWORD=$DB_PASSWORD" >> .env
             echo "KAFKA_HOST=$KAFKA_HOST" >> .env
+            docker image prune -a -f
             docker compose pull
             docker compose up -d

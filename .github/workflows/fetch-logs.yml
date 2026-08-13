@@ -1,0 +1,17 @@
+name: Fetch Logs
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  fetch-logs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1.2.2
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          password: ${{ secrets.VPS_PASSWORD }}
+          script: |
+            docker logs --tail 500 examination

@@ -25,6 +25,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     @Value("${jwt.secret}")
     private String jwtSecret;
 
+    @Value("${jwt.issuer:dts-identity-service}")
+    private String jwtIssuer;
+
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
@@ -38,11 +41,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
                 Claims claims = Jwts.parser()
                         .verifyWith(key)
+                        .requireIssuer(jwtIssuer)
                         .build()
                         .parseSignedClaims(token)
                         .getPayload();
 
-                String userIdStr = claims.get("userId", String.class);
+                // Identity service issue `sub` = userId (UUID). Đọc từ `sub` để đồng bộ với
+                // practice/progress/examination/content-builder (không dùng claim `userId`).
+                String userIdStr = claims.getSubject();
                 if (userIdStr != null) {
                     UUID userId = UUID.fromString(userIdStr);
                     UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(

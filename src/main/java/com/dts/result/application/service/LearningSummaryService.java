@@ -29,7 +29,8 @@ public class LearningSummaryService {
                 .findByUserIdAndTargetTypeAndTargetId(resultEntity.getUserId(), resultEntity.getTargetType(), resultEntity.getTargetId());
 
         LearningSummaryEntity summary;
-        BigDecimal eventScore = resultEntity.getScore() != null ? resultEntity.getScore() : BigDecimal.ZERO;
+        boolean hasScore = resultEntity.getScore() != null;
+        BigDecimal eventScore = hasScore ? resultEntity.getScore() : BigDecimal.ZERO;
         boolean isSuccessResult = "PASSED".equals(eventResult) || "COMPLETED".equals(eventResult) || "SUBMITTED".equals(eventResult);
 
         if (summaryOpt.isEmpty()) {
@@ -40,9 +41,9 @@ public class LearningSummaryService {
                     .targetType(resultEntity.getTargetType())
                     .attemptCount(1)
                     .completionCount(isSuccessResult ? 1 : 0)
-                    .bestScore(eventScore)
-                    .latestScore(eventScore)
-                    .averageScore(eventScore)
+                    .bestScore(hasScore ? eventScore : null)
+                    .latestScore(hasScore ? eventScore : null)
+                    .averageScore(hasScore ? eventScore : null)
                     .progress(resultEntity.getProgress())
                     .totalDurationSeconds(resultEntity.getDurationSeconds())
                     .status(summaryMapper.deriveStatus(resultEntity.getProgress(), eventResult))
@@ -63,19 +64,23 @@ public class LearningSummaryService {
                 summary.setCompletionCount(summary.getCompletionCount() + 1);
             }
             
-            summary.setLatestScore(eventScore);
-            
-            if (summary.getBestScore() == null || eventScore.compareTo(summary.getBestScore()) > 0) {
-                summary.setBestScore(eventScore);
-            }
-            
-            // Recalculate average score incrementally
-            if (summary.getAverageScore() != null) {
-                BigDecimal oldTotal = summary.getAverageScore().multiply(BigDecimal.valueOf(oldAttemptCount));
-                BigDecimal newTotal = oldTotal.add(eventScore);
-                summary.setAverageScore(newTotal.divide(BigDecimal.valueOf(newAttemptCount), 2, RoundingMode.HALF_UP));
-            } else {
-                summary.setAverageScore(eventScore);
+            // SUBMITTED chưa chấm điểm (score null) không được ghi đè latest/best/average về 0.
+            // examination luôn gửi score=totalScore, nhưng phòng hờ cho event không kèm score.
+            if (hasScore) {
+                summary.setLatestScore(eventScore);
+
+                if (summary.getBestScore() == null || eventScore.compareTo(summary.getBestScore()) > 0) {
+                    summary.setBestScore(eventScore);
+                }
+
+                // Recalculate average score incrementally
+                if (summary.getAverageScore() != null) {
+                    BigDecimal oldTotal = summary.getAverageScore().multiply(BigDecimal.valueOf(oldAttemptCount));
+                    BigDecimal newTotal = oldTotal.add(eventScore);
+                    summary.setAverageScore(newTotal.divide(BigDecimal.valueOf(newAttemptCount), 2, RoundingMode.HALF_UP));
+                } else {
+                    summary.setAverageScore(eventScore);
+                }
             }
             
             summary.setTotalDurationSeconds(summary.getTotalDurationSeconds() + resultEntity.getDurationSeconds());

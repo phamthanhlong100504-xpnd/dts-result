@@ -31,7 +31,7 @@ ALTER TABLE learning_results
     ADD CONSTRAINT pk_learning_results PRIMARY KEY (id),
     ADD CONSTRAINT ck_learning_results_source_type CHECK (source_type IN ('EXAM_SESSION', 'PRACTICE_SESSION', 'LESSON_SESSION', 'ASSIGNMENT_SESSION')),
     ADD CONSTRAINT ck_learning_results_target_type CHECK (target_type IN ('EXAM', 'PRACTICE_SET', 'CHAPTER', 'LESSON', 'LEARNING_PROGRAM')),
-    ADD CONSTRAINT ck_learning_results_result CHECK (result IN ('PASSED', 'FAILED', 'COMPLETED', 'ABANDONED', 'EXPIRED'));
+    ADD CONSTRAINT ck_learning_results_result CHECK (result IN ('PASSED', 'FAILED', 'COMPLETED', 'ABANDONED', 'EXPIRED', 'SUBMITTED'));
 
 COMMENT ON COLUMN learning_results.id IS 'Khóa chính';
 COMMENT ON COLUMN learning_results.user_id IS 'Người dùng (tham chiếu tới dts-identity)';
@@ -44,7 +44,7 @@ COMMENT ON COLUMN learning_results.score IS 'Điểm số đạt được';
 COMMENT ON COLUMN learning_results.max_score IS 'Điểm số tối đa có thể đạt được';
 COMMENT ON COLUMN learning_results.progress IS 'Tỷ lệ phần trăm hoàn thành (%)';
 COMMENT ON COLUMN learning_results.duration_seconds IS 'Thời gian thực hiện (giây)';
-COMMENT ON COLUMN learning_results.result IS 'Trạng thái kết quả của lần thực hiện (PASSED, FAILED, COMPLETED, ABANDONED, EXPIRED)';
+COMMENT ON COLUMN learning_results.result IS 'Trạng thái kết quả của lần thực hiện (PASSED, FAILED, COMPLETED, ABANDONED, EXPIRED, SUBMITTED)';
 COMMENT ON COLUMN learning_results.started_at IS 'Thời điểm bắt đầu thực hiện';
 COMMENT ON COLUMN learning_results.completed_at IS 'Thời điểm kết thúc thực hiện';
 COMMENT ON COLUMN learning_results.result_snapshot IS 'Snapshot chi tiết về kết quả (VD: {"correctQuestions": 34, "wrongQuestions": 6, "unansweredQuestions": 0, "passingScore": 80, "examVersionId": "..."})';

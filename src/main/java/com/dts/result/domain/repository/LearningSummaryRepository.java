@@ -50,6 +50,9 @@ public interface LearningSummaryRepository extends JpaRepository<LearningSummary
            "SUM(CASE WHEN s.targetType = 'LEARNING_PROGRAM' AND s.status = 'IN_PROGRESS' THEN 1 ELSE 0 END), " +
            "SUM(CASE WHEN s.targetType = 'CHAPTER' AND s.status = 'COMPLETED' THEN 1 ELSE 0 END), " +
            "SUM(CASE WHEN s.targetType = 'LESSON' AND s.status = 'COMPLETED' THEN 1 ELSE 0 END), " +
+           "SUM(CASE WHEN s.targetType = 'EXAM' THEN s.attemptCount ELSE 0 END), " +
+           "SUM(CASE WHEN s.targetType = 'EXAM' THEN s.completionCount ELSE 0 END), " +
+           "SUM(CASE WHEN s.targetType = 'EXAM' THEN (s.attemptCount - s.completionCount) ELSE 0 END), " +
            "AVG(s.latestScore), " +
            "MAX(s.bestScore), " +
            "SUM(s.totalDurationSeconds), " +
@@ -57,6 +60,7 @@ public interface LearningSummaryRepository extends JpaRepository<LearningSummary
            "MAX(s.lastActivityAt) " +
            "FROM LearningSummaryEntity s WHERE s.userId = :userId")
     List<Object[]> aggregateOverview(@Param("userId") UUID userId);
+
 
     List<LearningSummaryEntity> findByUserId(UUID userId);
 }

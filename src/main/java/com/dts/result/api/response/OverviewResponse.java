@@ -21,5 +21,8 @@ public class OverviewResponse {
     private BigDecimal bestScore;
     private long totalLearningTimeSeconds;
     private long totalAttempts;
+    private long totalExamsTaken;
+    private long passedExams;
+    private long failedExams;
     private Instant lastActivityAt;
 }

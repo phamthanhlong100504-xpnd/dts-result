@@ -45,22 +45,28 @@ public class OverviewService {
         long inProgressPrograms = row[1] != null ? (Long) row[1] : 0;
         long completedChapters = row[2] != null ? (Long) row[2] : 0;
         long completedLessons = row[3] != null ? (Long) row[3] : 0;
+        long totalExamsTaken = row[4] != null ? (Long) row[4] : 0;
+        long passedExams = row[5] != null ? (Long) row[5] : 0;
+        long failedExams = row[6] != null ? (Long) row[6] : 0;
         
-        Double avgScore = (Double) row[4];
+        Double avgScore = (Double) row[7];
         BigDecimal averageScore = avgScore != null ? BigDecimal.valueOf(avgScore).setScale(2, RoundingMode.HALF_UP) : BigDecimal.ZERO;
         
-        BigDecimal bestScore = (BigDecimal) row[5];
+        BigDecimal bestScore = (BigDecimal) row[8];
         if (bestScore == null) bestScore = BigDecimal.ZERO;
         
-        long totalLearningTimeSeconds = row[6] != null ? (Long) row[6] : 0;
-        long totalAttempts = row[7] != null ? (Long) row[7] : 0;
-        Instant lastActivityAt = (Instant) row[8];
+        long totalLearningTimeSeconds = row[9] != null ? (Long) row[9] : 0;
+        long totalAttempts = row[10] != null ? (Long) row[10] : 0;
+        Instant lastActivityAt = (Instant) row[11];
 
         return OverviewResponse.builder()
                 .completedPrograms(completedPrograms)
                 .inProgressPrograms(inProgressPrograms)
                 .completedChapters(completedChapters)
                 .completedLessons(completedLessons)
+                .totalExamsTaken(totalExamsTaken)
+                .passedExams(passedExams)
+                .failedExams(failedExams)
                 .averageScore(averageScore)
                 .bestScore(bestScore)
                 .totalLearningTimeSeconds(totalLearningTimeSeconds)

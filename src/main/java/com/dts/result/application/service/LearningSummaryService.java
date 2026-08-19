@@ -31,7 +31,10 @@ public class LearningSummaryService {
         LearningSummaryEntity summary;
         boolean hasScore = resultEntity.getScore() != null;
         BigDecimal eventScore = hasScore ? resultEntity.getScore() : BigDecimal.ZERO;
-        boolean isSuccessResult = "PASSED".equals(eventResult) || "COMPLETED".equals(eventResult) || "SUBMITTED".equals(eventResult);
+        boolean isSuccessResult = "PASSED".equals(eventResult) || "COMPLETED".equals(eventResult);
+        if (!"EXAM".equals(resultEntity.getTargetType())) {
+            isSuccessResult = isSuccessResult || "SUBMITTED".equals(eventResult);
+        }
 
         if (summaryOpt.isEmpty()) {
             summary = LearningSummaryEntity.builder()

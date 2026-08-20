@@ -76,17 +76,14 @@ jobs:
             cd ${{ env.DEPLOY_DIR }}
             mv -f docker-compose.prod.yml docker-compose.yml
             export GITHUB_OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
-            sed -i "s/\${GITHUB_OWNER}/$GITHUB_OWNER/g" docker-compose.yml
+            sed -i "s/${GITHUB_OWNER}/$GITHUB_OWNER/g" docker-compose.yml
             echo "DB_HOST=$DB_HOST" > .env
             echo "DB_PORT=$DB_PORT" >> .env
             echo "DB_PASSWORD=$DB_PASSWORD" >> .env
-            echo "KAFKA_HOST=\" >> .env
-              echo \ | docker login ghcr.io -u \ --password-stdin
+            echo "KAFKA_HOST=$KAFKA_HOST" >> .env
+            echo $GITHUB_TOKEN | docker login ghcr.io -u $GITHUB_OWNER --password-stdin
             docker image prune -a -f
             docker compose pull
             docker compose up -d
-
-
-
 
 

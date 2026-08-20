@@ -28,6 +28,14 @@ jobs:
           path: ~/.m2/repository
           key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
       
+      - run: ./mvnw test -B
+      
+      - name: Publish Test Report
+        uses: EnricoMi/publish-unit-test-result-action@v2
+        if: always()
+        with:
+          files: '**/surefire-reports/*.xml'
+
       - run: ./mvnw clean package -B -DskipTests
 
       - uses: docker/login-action@v3
@@ -55,12 +63,13 @@ jobs:
           DB_PORT: ${{ secrets.DB_PORT }}
           DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
           KAFKA_HOST: ${{ secrets.KAFKA_HOST }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           password: ${{ secrets.VPS_PASSWORD }}
           timeout: 30m
-          envs: DB_HOST,DB_PORT,DB_PASSWORD,KAFKA_HOST
+          envs: DB_HOST,DB_PORT,DB_PASSWORD,KAFKA_HOST,GITHUB_TOKEN
           script: |
             cd ${{ env.DEPLOY_DIR }}
             mv -f docker-compose.prod.yml docker-compose.yml
@@ -69,7 +78,11 @@ jobs:
             echo "DB_HOST=$DB_HOST" > .env
             echo "DB_PORT=$DB_PORT" >> .env
             echo "DB_PASSWORD=$DB_PASSWORD" >> .env
-            echo "KAFKA_HOST=$KAFKA_HOST" >> .env
+            echo "KAFKA_HOST=\" >> .env
+              echo \ | docker login ghcr.io -u \ --password-stdin
             docker image prune -a -f
             docker compose pull
             docker compose up -d
+
+
+

@@ -14,4 +14,4 @@ jobs:
           username: ${{ secrets.VPS_USER }}
           password: ${{ secrets.VPS_PASSWORD }}
           script: |
-            docker logs --tail 500 examination
+            docker logs --tail 500 dts-result

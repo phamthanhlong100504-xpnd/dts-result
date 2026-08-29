@@ -76,14 +76,14 @@ class SummaryServiceTest {
     @Test
     @DisplayName("getSummaryDetail - Not Found")
     void getSummaryDetail_NotFound() {
-        when(summaryRepository.findByUserIdAndTargetTypeAndTargetId(userId, "COURSE", targetId)).thenReturn(Optional.empty());
+        when(summaryRepository.findReadOnlyByUserIdAndTargetTypeAndTargetId(userId, "COURSE", targetId)).thenReturn(Optional.empty());
         assertThrows(ResourceNotFoundException.class, () -> summaryService.getSummaryDetail(userId, "COURSE", targetId));
     }
 
     @Test
     @DisplayName("getSummaryDetail - Happy Case")
     void getSummaryDetail_HappyCase() {
-        when(summaryRepository.findByUserIdAndTargetTypeAndTargetId(userId, "COURSE", targetId)).thenReturn(Optional.of(summaryEntity));
+        when(summaryRepository.findReadOnlyByUserIdAndTargetTypeAndTargetId(userId, "COURSE", targetId)).thenReturn(Optional.of(summaryEntity));
         SummaryDetailResponse response = summaryService.getSummaryDetail(userId, "COURSE", targetId);
         assertNotNull(response);
         assertEquals("COURSE", response.getTargetType());

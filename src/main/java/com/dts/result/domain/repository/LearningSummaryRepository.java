@@ -21,6 +21,11 @@ public interface LearningSummaryRepository extends JpaRepository<LearningSummary
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<LearningSummaryEntity> findByUserIdAndTargetTypeAndTargetId(UUID userId, String targetType, UUID targetId);
 
+    @Query("SELECT s FROM LearningSummaryEntity s WHERE s.userId = :userId AND s.targetType = :targetType AND s.targetId = :targetId")
+    Optional<LearningSummaryEntity> findReadOnlyByUserIdAndTargetTypeAndTargetId(@Param("userId") UUID userId,
+                                                                                 @Param("targetType") String targetType,
+                                                                                 @Param("targetId") UUID targetId);
+
     @Query("SELECT s FROM LearningSummaryEntity s WHERE s.userId = :userId " +
            "AND (:targetType IS NULL OR s.targetType = :targetType) " +
            "AND (:status IS NULL OR s.status = :status)")

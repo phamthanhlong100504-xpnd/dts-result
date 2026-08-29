@@ -49,7 +49,7 @@ public class SummaryService {
     public SummaryDetailResponse getSummaryDetail(UUID userId, String targetType, UUID targetId) {
         log.info("Fetching summary detail for userId: {}, targetType: {}, targetId: {}", userId, targetType, targetId);
         
-        LearningSummaryEntity entity = summaryRepository.findByUserIdAndTargetTypeAndTargetId(userId, targetType, targetId)
+        LearningSummaryEntity entity = summaryRepository.findReadOnlyByUserIdAndTargetTypeAndTargetId(userId, targetType, targetId)
                 .orElseThrow(() -> new ResourceNotFoundException("Learning summary not found"));
 
         return SummaryDetailResponse.builder()

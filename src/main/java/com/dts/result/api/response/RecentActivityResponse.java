@@ -12,6 +12,7 @@ import java.util.UUID;
 public class RecentActivityResponse {
     private String targetType;
     private UUID targetId;
+    private UUID sourceId;
     private String result;
     private BigDecimal score;
     private Instant completedAt;

@@ -113,6 +113,7 @@ public class HistoryService {
                 .map(entity -> RecentActivityResponse.builder()
                         .targetType(entity.getTargetType())
                         .targetId(entity.getTargetId())
+                        .sourceId(entity.getSourceId())
                         .result(entity.getResult())
                         .score(entity.getScore())
                         .completedAt(entity.getCompletedAt())

@@ -5,9 +5,9 @@ services:
     restart: unless-stopped
     ports: ["8086:8080"]
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://${DB_HOST}:${DB_PORT:-5432}/dts_result_db
+      SPRING_DATASOURCE_URL: jdbc:postgresql://103.20.96.85:5434/dts_result_db
       SPRING_DATASOURCE_USERNAME: postgres
-      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
+      SPRING_DATASOURCE_PASSWORD: K59Ptl*100504
       SPRING_KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_HOST:-kafka}:9092
       JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:-uPq3xK8mR5vY2wZ9aB4cD7eF1gH3iJ6kL0nO5pQ8rS2tU4vW6xY9zA1bC3dE7fG9}
       JWT_ISSUER: ${JWT_ISSUER:-dts-identity-service}

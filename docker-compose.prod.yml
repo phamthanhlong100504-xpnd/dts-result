@@ -15,8 +15,8 @@ services:
       KAFKA_TOPIC_LEARNING_RESULTS: learning-results
     networks:
       - dts-network
-      - media_default
+
 
 networks:
   dts-network: { external: true }
-  media_default: { external: true }
+

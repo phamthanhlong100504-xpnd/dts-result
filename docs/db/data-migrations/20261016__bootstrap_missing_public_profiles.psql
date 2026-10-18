@@ -1,0 +1,68 @@
+-- Explicit, repeatable data migration for legacy users whose Identity events expired.
+-- Never called at application startup. Operator supplies an administrator-verified
+-- minimal Identity snapshot as UTF-8 JSON array encoded in packet_base64.
+-- No Identity writes or invented Kafka events. Existing cache rows are not replaced.
+\set ON_ERROR_STOP on
+BEGIN;
+SET LOCAL lock_timeout='5s';
+SET LOCAL statement_timeout='30s';
+SET LOCAL timezone='UTC';
+SELECT set_config('dts.profile.expected_database',:'expected_database',true),
+ set_config('dts.profile.packet',convert_from(decode(:'packet_base64','base64'),'UTF8'),true);
+DO $validate$
+DECLARE packet JSONB:=current_setting('dts.profile.packet')::jsonb; item JSONB;
+ who UUID; administrator UUID; stamp BIGINT; modified TIMESTAMPTZ; observed TIMESTAMPTZ; name TEXT;
+BEGIN
+ IF current_database()<>current_setting('dts.profile.expected_database') OR session_user<>'postgres' THEN
+  RAISE EXCEPTION 'Wrong data migration target or operator';
+ END IF;
+ IF NOT EXISTS(SELECT 1 FROM public.dts_result_schema_history WHERE version='V004'
+  AND checksum='2DBDA73B82AF1B53C098BD72970FA1CD2FCBA2FD8419E6AE6C47AF76BA0E5A06') THEN
+  RAISE EXCEPTION 'Expected canonical V004 projection schema';
+ END IF;
+ IF jsonb_typeof(packet)<>'array' OR jsonb_array_length(packet) NOT BETWEEN 1 AND 100 THEN
+  RAISE EXCEPTION 'Expected a bounded nonempty Identity snapshot array';
+ END IF;
+ IF (SELECT count(DISTINCT value->>'userId') FROM jsonb_array_elements(packet))<>jsonb_array_length(packet) THEN
+  RAISE EXCEPTION 'Duplicate profile identities';
+ END IF;
+ FOR item IN SELECT value FROM jsonb_array_elements(packet) LOOP
+  IF jsonb_typeof(item)<>'object' OR item-ARRAY['userId','displayName','sourceUpdatedAt','sourceTimestamp',
+   'observedAt','adminUserId','adminHttpVerified','evidenceRef']<>'{}'::jsonb THEN
+   RAISE EXCEPTION 'Only minimal administrator-verified public profile fields are accepted';
+  END IF;
+  who:=(item->>'userId')::uuid; administrator:=(item->>'adminUserId')::uuid;
+  name:=item->>'displayName'; modified:=(item->>'sourceUpdatedAt')::timestamptz;
+  observed:=(item->>'observedAt')::timestamptz;stamp:=(item->>'sourceTimestamp')::bigint;
+  IF jsonb_typeof(item->'displayName') IS DISTINCT FROM 'string' OR who IS NULL OR administrator IS NULL OR who='00000000-0000-0000-0000-000000000000'::uuid
+   OR administrator='00000000-0000-0000-0000-000000000000'::uuid OR name IS NULL OR length(btrim(name)) NOT BETWEEN 1 AND 255
+   OR modified IS NULL OR observed IS NULL OR stamp IS NULL OR stamp<=0
+   OR stamp<>floor(extract(epoch FROM modified)*1000)::bigint
+   OR modified>observed+interval '30 seconds' OR observed<clock_timestamp()-interval '10 minutes'
+   OR observed>clock_timestamp()+interval '30 seconds'
+   OR item->'adminHttpVerified' IS DISTINCT FROM 'true'::jsonb
+   OR COALESCE(length(btrim(item->>'evidenceRef')),0) NOT BETWEEN 1 AND 500 THEN
+   RAISE EXCEPTION 'Invalid, stale or unverified Identity profile snapshot';
+  END IF;
+ END LOOP;
+END;
+$validate$;
+-- Order 0 / partition -1 / offset -1 mark a verified bootstrap, not a Kafka receipt.
+-- Source updatedAt blocks older retained events; real events at the same millisecond
+-- have event order 1..3 and take precedence. Future Identity events keep normal flow.
+INSERT INTO public.leaderboard_public_profiles(user_id,display_name,deleted,source_timestamp,
+ source_event_order,source_partition,source_offset)
+SELECT (value->>'userId')::uuid,value->>'displayName',FALSE,(value->>'sourceTimestamp')::bigint,0,-1,-1
+FROM jsonb_array_elements(current_setting('dts.profile.packet')::jsonb)
+ON CONFLICT(user_id) DO NOTHING;
+DO $verify$
+BEGIN
+ IF EXISTS(SELECT 1 FROM jsonb_array_elements(current_setting('dts.profile.packet')::jsonb) j
+  LEFT JOIN public.leaderboard_public_profiles p ON p.user_id=(j.value->>'userId')::uuid
+  WHERE p.user_id IS NULL OR p.deleted OR p.display_name IS DISTINCT FROM j.value->>'displayName') THEN
+  RAISE EXCEPTION 'A concurrent or existing profile differs; no existing row was overwritten';
+ END IF;
+END;
+$verify$;
+SELECT jsonb_build_object('ProfileBootstrapPassed',TRUE,'VerifiedProfiles',jsonb_array_length(current_setting('dts.profile.packet')::jsonb));
+COMMIT;

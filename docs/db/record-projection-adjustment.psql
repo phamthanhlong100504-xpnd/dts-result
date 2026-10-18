@@ -1,0 +1,53 @@
+-- Administrative evidence journal; never invoke from the student frontend.
+-- Required psql variables are described in docs/api/SCREEN14_16_BACKEND.md.
+\set ON_ERROR_STOP on
+BEGIN;
+SET LOCAL lock_timeout='5s';
+SET LOCAL statement_timeout='30s';
+SELECT set_config('dts.adjustment.database', :'expected_database', true);
+SELECT set_config('dts.adjustment.event', :'adjustment_event_id', true);
+SELECT set_config('dts.adjustment.source_type', :'source_type', true);
+SELECT set_config('dts.adjustment.source_id', :'source_id', true);
+SELECT set_config('dts.adjustment.hash', :'expected_source_hash', true);
+SELECT set_config('dts.adjustment.excluded', :'excluded', true);
+SELECT set_config('dts.adjustment.reason', :'reason_code', true);
+SELECT set_config('dts.adjustment.evidence', :'evidence_ref', true);
+DO $guard$
+DECLARE v_actual_hash TEXT; v_source_type TEXT:=current_setting('dts.adjustment.source_type');
+ v_source_id UUID:=current_setting('dts.adjustment.source_id')::uuid;
+BEGIN
+ IF current_database()<>current_setting('dts.adjustment.database') THEN RAISE EXCEPTION 'Wrong target database'; END IF;
+ PERFORM pg_advisory_xact_lock(hashtextextended('projection-adjustment:'||v_source_type||':'||v_source_id,0));
+ IF v_source_type='PRACTICE_QUESTION' THEN
+  SELECT md5(to_jsonb(q)::text) INTO v_actual_hash FROM study_question_facts q WHERE q.event_id=v_source_id;
+ ELSIF v_source_type IN ('PRACTICE_SESSION','EXAM_SESSION') THEN
+  SELECT md5(to_jsonb(r)::text) INTO v_actual_hash FROM learning_results r
+   WHERE r.source_type=v_source_type AND r.source_id=v_source_id AND r.result_available IS TRUE;
+ ELSE RAISE EXCEPTION 'Unsupported adjustment source'; END IF;
+ IF v_actual_hash IS NULL OR v_actual_hash<>lower(current_setting('dts.adjustment.hash')) THEN
+  RAISE EXCEPTION 'Verified source row/hash does not match; no adjustment accepted';
+ END IF;
+END;
+$guard$;
+INSERT INTO result_projection_adjustments(event_id,source_type,source_id,excluded,reason_code,evidence_ref)
+-- Filter already recorded events before identity allocation; direct reruns keep the sequence stable.
+SELECT current_setting('dts.adjustment.event')::uuid,current_setting('dts.adjustment.source_type'),
+ current_setting('dts.adjustment.source_id')::uuid,current_setting('dts.adjustment.excluded')::boolean,
+ current_setting('dts.adjustment.reason'),current_setting('dts.adjustment.evidence')
+WHERE NOT EXISTS(SELECT 1 FROM result_projection_adjustments a
+ WHERE a.event_id=current_setting('dts.adjustment.event')::uuid)
+ON CONFLICT(event_id) DO NOTHING;
+DO $verify$
+BEGIN
+ IF NOT EXISTS(SELECT 1 FROM result_projection_adjustments WHERE
+  event_id=current_setting('dts.adjustment.event')::uuid
+  AND source_type=current_setting('dts.adjustment.source_type')
+  AND source_id=current_setting('dts.adjustment.source_id')::uuid
+  AND excluded=current_setting('dts.adjustment.excluded')::boolean
+  AND reason_code=current_setting('dts.adjustment.reason')
+  AND evidence_ref=current_setting('dts.adjustment.evidence')) THEN
+   RAISE EXCEPTION 'An adjustment ID cannot replace a different decision';
+ END IF;
+END;
+$verify$;
+COMMIT;

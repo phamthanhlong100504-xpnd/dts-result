@@ -1,0 +1,102 @@
+{
+  "Service": "dts-result",
+  "DefaultDatabase": "dts_result_db",
+  "HistoryTable": "dts_result_schema_history",
+  "RequiredTables": [
+    "learning_results",
+    "learning_summaries",
+    "study_question_facts",
+    "practice_exp_policy_events",
+    "result_projection_adjustments",
+    "leaderboard_public_profiles"
+  ],
+  "Files": [
+    {
+      "Path": "docs/db/00_trigger_functions.sql",
+      "SHA256": "A8BD79CE814E6A10962436675D10707960324680378943B7D0829537B48F444C"
+    },
+    {
+      "Path": "docs/db/SCREEN12_SCHEMA.md",
+      "SHA256": "2F975DBACA79EE43ABABF0190BF9FE9C171553E9BB2909A5FE701FE868E4EC1C"
+    },
+    {
+      "Path": "docs/db/apply-schema.psql",
+      "SHA256": "A9D78869F9E3BC15289F8E766105E158927F1BEEF045184E840B5817BC267A68"
+    },
+    {
+      "Path": "docs/db/learning_results.sql",
+      "SHA256": "67925807B811DD1F1F2577A59FF0636936E37FA290C3FBE8EA26A58AAD329293"
+    },
+    {
+      "Path": "docs/db/learning_summaries.sql",
+      "SHA256": "CDBA83836227C89A0B7C3EE0080CDC8126604CE813DC5CA61C42202EA2C414E9"
+    },
+    {
+      "Path": "docs/db/migrations/V001__baseline_entity_schema.sql",
+      "SHA256": "2ACEED51CD88FA282970176F85E6E7925AF70B21381CED18804F536E8D2730A2"
+    },
+    {
+      "Path": "docs/db/migrations/V002__screen12_contract_integrity.sql",
+      "SHA256": "51C2829D97ED4C148307EDFA0B13866A2F8810B3FEF0A75EF5E37B03F08EDC26"
+    },
+    {
+      "Path": "docs/db/tests/checksum-fixture.sql",
+      "SHA256": "1C1A79A0479309B1F0D565D80C2E521FFD2AFA7556C87A8CE4199F75619A3DF1"
+    },
+    {
+      "Path": "docs/db/tests/invalid-legacy-fixture.sql",
+      "SHA256": "4EC76339AFCE63D501D3FF34AB5A44A87071A9EB975823459E3B2931FF797563"
+    },
+    {
+      "Path": "docs/db/tests/legacy-fixture.sql",
+      "SHA256": "26A4EBDB03FD406737A9FD7F32F044F7C917AE6A8216334EB8A9042FFF0EB2F2"
+    },
+    {
+      "Path": "docs/db/tests/schema-smoke.sql",
+      "SHA256": "86EDBBA179C9F8346CC5661ABD83A3EF000C9FFABFA2432B35D8DC585612B23E"
+    },
+    {
+      "Path": "docs/db/tests/verify-checksum-refusal.sql",
+      "SHA256": "897AC8FBDBFD20C30D621BE8F3337F849776C346AC27183A732359A484D14962"
+    },
+    {
+      "Path": "docs/db/tests/verify-preserved.sql",
+      "SHA256": "6B06566D032B3E8A721B412A555C0F7556D01C16ADE900EAAEC7206B85DD6046"
+    },
+    {
+      "Path": "docs/db/tests/verify-rollback.sql",
+      "SHA256": "CF3E4DF31B68361F01048E49443D090713C25ED2DD61F8CC00172B26C601ABDD"
+    },
+    {
+      "Path": "docs/db/verify-schema.sql",
+      "SHA256": "662064FA27E32EC7AE92BE5DF8BD212E4F43CDB885E5C30D8954B9A090734FDC"
+    },
+    {
+      "Path": "tools/screen12-schema.ps1",
+      "SHA256": "93AE368E2DD8B7D6832697DE3B8B10BCAEEEF3555FA32712187335437F514499"
+    },
+    {
+      "Path": "tools/screen12_schema.py",
+      "SHA256": "610AA96F84262D0D7EA7C12FBA046F7C4DE454B160C631F8923C98CED12829DC"
+    },
+    {
+      "Path": "docs/db/migrations/V003__screen13_exam_history.sql",
+      "SHA256": "4F3916D7852EF3D71383AB416633028393D961C203E1BB08673CAD34CFC58276"
+    },
+    {
+      "Path": "docs/db/migrations/V004__screen14_exp_and_screen16_analytics.sql",
+      "SHA256": "2DBDA73B82AF1B53C098BD72970FA1CD2FCBA2FD8419E6AE6C47AF76BA0E5A06"
+    },
+    {
+      "Path": "docs/db/record-projection-adjustment.psql",
+      "SHA256": "619E7E2BAE79FBFA534F7013CE80C2639DB17B7C501E49625B73030D11936E6A"
+    }
+  ],
+  "Revision": 3,
+  "SchemaVersions": [
+    "V001",
+    "V002",
+    "V003",
+    "V004"
+  ]
+}

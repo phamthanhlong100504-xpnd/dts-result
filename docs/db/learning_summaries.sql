@@ -1,3 +1,5 @@
+-- Reference DDL for a NEW database; use apply-schema.psql for managed fresh/existing migrations.
+-- Load 00_trigger_functions.sql before these standalone reference files.
 -- Table: learning_summaries
 -- Service: dts-result
 -- Entities mapped: LearningSummary
@@ -63,7 +65,7 @@ CREATE INDEX ix_learning_summaries_user_id ON learning_summaries (user_id);
 CREATE INDEX ix_learning_summaries_status ON learning_summaries (status);
 
 -- Trigger: auto-update updated_at on row modification
-CREATE OR REPLACE FUNCTION trigger_set_updated_at()
+CREATE OR REPLACE FUNCTION dts_result_set_updated_at()
 RETURNS TRIGGER AS $$
 BEGIN
     NEW.updated_at = CURRENT_TIMESTAMP;
@@ -74,4 +76,4 @@ $$ LANGUAGE plpgsql;
 CREATE TRIGGER trg_learning_summaries_updated_at
     BEFORE UPDATE ON learning_summaries
     FOR EACH ROW
-    EXECUTE FUNCTION trigger_set_updated_at();
+    EXECUTE FUNCTION dts_result_set_updated_at();

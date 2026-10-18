@@ -1,0 +1,38 @@
+\set ON_ERROR_STOP on
+-- Destructive fixture scope is a uniquely owned clone, never the business database.
+SELECT current_database()=:'expected_database' AND current_database() ~ '^dts1416_finalize_[0-9]{14}_[0-9a-f]{12}$' AS owned_clone \gset
+\if :owned_clone
+\else
+\quit 3
+\endif
+WITH snapshot AS (SELECT clock_timestamp() AS observed)
+SELECT encode(convert_to(jsonb_build_array(jsonb_build_object(
+ 'userId','14f10000-0000-0000-0000-000000000001','displayName','Nguyễn Thị Ánh',
+ 'sourceUpdatedAt',observed-interval '1 day',
+ 'sourceTimestamp',floor(extract(epoch FROM observed-interval '1 day')*1000)::bigint,
+ 'observedAt',observed,'adminUserId','14f10000-0000-0000-0000-000000000002',
+ 'adminHttpVerified',TRUE,'evidenceRef','owned-clone-public-profile-smoke'))::text,'UTF8'),'base64') AS packet_base64 FROM snapshot \gset
+\ir ../data-migrations/20261016__bootstrap_missing_public_profiles.psql
+SELECT md5(to_jsonb(p)::text) AS first_profile_hash FROM public.leaderboard_public_profiles p
+ WHERE user_id='14f10000-0000-0000-0000-000000000001' \gset
+\ir ../data-migrations/20261016__bootstrap_missing_public_profiles.psql
+SELECT md5(to_jsonb(p)::text)=:'first_profile_hash' AND p.display_name='Nguyễn Thị Ánh'
+ AND p.source_event_order=0 AND p.source_partition=-1 AND p.source_offset=-1 AS repeat_stable
+ FROM public.leaderboard_public_profiles p WHERE user_id='14f10000-0000-0000-0000-000000000001' \gset
+\if :repeat_stable
+\else
+\quit 3
+\endif
+DO $ordering$
+DECLARE p public.leaderboard_public_profiles%ROWTYPE;
+BEGIN
+ SELECT * INTO STRICT p FROM public.leaderboard_public_profiles
+ WHERE user_id='14f10000-0000-0000-0000-000000000001';
+ IF (p.source_timestamp-1,3,99,999::bigint)>(p.source_timestamp,p.source_event_order,p.source_partition,p.source_offset)
+  OR NOT ((p.source_timestamp,1,0,0::bigint)>(p.source_timestamp,p.source_event_order,p.source_partition,p.source_offset))
+  OR NOT ((p.source_timestamp+1,1,0,0::bigint)>(p.source_timestamp,p.source_event_order,p.source_partition,p.source_offset)) THEN
+  RAISE EXCEPTION 'Bootstrap ordering must reject older events and permit equal/newer real Identity events';
+ END IF;
+END;
+$ordering$;
+SELECT jsonb_build_object('BootstrapSmokePassed',TRUE,'UnicodeName',TRUE,'RepeatPreservedEntireRow',TRUE,'IdentityEventOrdering',TRUE);

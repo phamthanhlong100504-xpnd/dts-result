@@ -4,6 +4,7 @@ import com.dts.result.application.event.LearningResultEvent;
 import com.dts.result.api.exception.BusinessException;
 import com.dts.result.api.exception.ValidationException;
 import com.dts.result.application.service.LearningResultService;
+import com.dts.result.application.service.StudyExpEventService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
@@ -19,8 +20,10 @@ import org.springframework.stereotype.Component;
 public class LearningResultConsumer {
 
     private final LearningResultService learningResultService;
+    private final StudyExpEventService studyExpEventService;
 
     @RetryableTopic(
+            kafkaTemplate = "learningResultRetryKafkaTemplate",
             attempts = "3",
             backoff = @Backoff(delay = 1000, multiplier = 2.0, maxDelay = 5000),
             dltStrategy = DltStrategy.FAIL_ON_ERROR,
@@ -39,7 +42,8 @@ public class LearningResultConsumer {
 
             log.info("Received LearningResultEvent from Kafka");
             
-            learningResultService.processLearningResult(event);
+            if(studyExpEventService.handles(event)) studyExpEventService.record(event);
+            else learningResultService.processLearningResult(event);
             
             log.info("Finished processing LearningResultEvent");
         } finally {

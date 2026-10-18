@@ -18,6 +18,10 @@ public class LearningResultMapper {
                 .sourceType(event.getSourceType())
                 .targetType(event.getTargetType())
                 .attemptNo(attemptNo)
+                .activityType(event.getActivityType()).displayTitle(event.getDisplayTitle())
+                .licenseClass(event.getLicenseClass()).correctCount(event.getCorrectCount() != null ? event.getCorrectCount() : count(event,"correctCount"))
+                .questionCount(event.getQuestionCount() != null ? event.getQuestionCount() : count(event,"totalQuestions")).resultAvailable(event.getResultAvailable())
+                .reviewAvailable(event.getReviewAvailable()).eventVersion(event.getEventVersion())
                 .score(event.getScore())
                 .maxScore(event.getMaxScore())
                 .progress(BigDecimal.valueOf(event.getProgress() != null ? event.getProgress() : 0.0))
@@ -28,5 +32,13 @@ public class LearningResultMapper {
                 .resultSnapshot(event.getResultSnapshot())
                 .metadata(event.getMetadata())
                 .build();
+    }
+    private Integer count(LearningResultEvent event,String name) {
+        Object value=event.getResultSnapshot()==null ? null : event.getResultSnapshot().get(name);
+        if (!(value instanceof Number number)) return null;
+        try {
+            int result=new BigDecimal(number.toString()).intValueExact();
+            return result>=0 ? result : null;
+        } catch(ArithmeticException failure) {return null;}
     }
 }

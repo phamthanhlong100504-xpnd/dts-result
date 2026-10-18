@@ -38,13 +38,28 @@ public class HistoryController {
             @RequestParam(required = false) String targetType,
             @RequestParam(required = false) UUID targetId,
             @RequestParam(required = false) String result,
+            @RequestParam(required = false) String activityType,
+            @RequestParam(required = false) String licenseClass,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant to,
-            @PageableDefault(sort = "completedAt", direction = Sort.Direction.DESC, size = 20) Pageable pageable) {
+            @PageableDefault(sort = "completedAt", direction = Sort.Direction.DESC, size = 20) Pageable pageable,
+            jakarta.servlet.http.HttpServletRequest request) {
         
+        validatePageValue(request.getParameter("page"),0,Integer.MAX_VALUE,"page");
+        validatePageValue(request.getParameter("size"),1,100,"size");
         UUID userId = getCurrentUserId();
-        Page<HistoryItemResponse> response = historyService.getHistoryList(userId, targetType, targetId, result, from, to, pageable);
+        Page<HistoryItemResponse> response = historyService.getHistoryList(userId, targetType, targetId, result, activityType, licenseClass, from, to, pageable);
         return ResponseEntity.ok(response);
+    }
+
+    private void validatePageValue(String raw, int min, int max, String name) {
+        if (raw == null) return;
+        try {
+            int value=Integer.parseInt(raw);
+            if (value < min || value > max) throw new NumberFormatException();
+        } catch (NumberFormatException failure) {
+            throw new com.dts.result.api.exception.ValidationException("Invalid " + name);
+        }
     }
 
     @GetMapping("/history/{resultId}")

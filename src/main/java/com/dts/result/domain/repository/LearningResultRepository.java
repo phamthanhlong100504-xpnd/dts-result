@@ -12,6 +12,7 @@ import java.util.UUID;
 
 @Repository
 public interface LearningResultRepository extends JpaRepository<LearningResultEntity, UUID>, JpaSpecificationExecutor<LearningResultEntity> {
+    java.util.Optional<LearningResultEntity> findBySourceIdAndSourceType(UUID sourceId, String sourceType);
     boolean existsBySourceIdAndSourceType(UUID sourceId, String sourceType);
     int countByUserIdAndTargetIdAndTargetType(UUID userId, UUID targetId, String targetType);
     

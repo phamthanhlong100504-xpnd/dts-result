@@ -46,9 +46,9 @@ class HistoryServiceTest {
         resultEntity = new LearningResultEntity();
         resultEntity.setId(resultId);
         resultEntity.setUserId(userId);
-        resultEntity.setTargetType("COURSE");
+        resultEntity.setTargetType("CHAPTER");
         resultEntity.setTargetId(UUID.randomUUID());
-        resultEntity.setResult("PASS");
+        resultEntity.setResult("COMPLETED");
         resultEntity.setScore(java.math.BigDecimal.valueOf(100));
         resultEntity.setCompletedAt(Instant.now());
     }
@@ -58,13 +58,13 @@ class HistoryServiceTest {
     void getHistoryList_HappyCase() {
         Pageable pageable = PageRequest.of(0, 10);
         Page<LearningResultEntity> page = new PageImpl<>(List.of(resultEntity));
-        when(learningResultRepository.findAll(any(Specification.class), eq(pageable))).thenReturn(page);
+        when(learningResultRepository.findAll(any(Specification.class), any(Pageable.class))).thenReturn(page);
 
-        Page<HistoryItemResponse> response = historyService.getHistoryList(userId, "COURSE", UUID.randomUUID(), "PASS", Instant.now().minusSeconds(3600), Instant.now(), pageable);
+        Page<HistoryItemResponse> response = historyService.getHistoryList(userId, "CHAPTER", UUID.randomUUID(), "COMPLETED", Instant.now().minusSeconds(3600), Instant.now(), pageable);
 
         assertNotNull(response);
         assertEquals(1, response.getContent().size());
-        assertEquals("COURSE", response.getContent().get(0).getTargetType());
+        assertEquals("CHAPTER", response.getContent().get(0).getTargetType());
     }
 
     @Test
@@ -80,7 +80,7 @@ class HistoryServiceTest {
         when(learningResultRepository.findById(resultId)).thenReturn(Optional.of(resultEntity));
         HistoryDetailResponse response = historyService.getHistoryDetail(userId, resultId);
         assertNotNull(response);
-        assertEquals("PASS", response.getResult());
+        assertEquals("COMPLETED", response.getResult());
     }
 
     @Test
@@ -93,6 +93,6 @@ class HistoryServiceTest {
 
         assertNotNull(responses);
         assertEquals(1, responses.size());
-        assertEquals("COURSE", responses.get(0).getTargetType());
+        assertEquals("CHAPTER", responses.get(0).getTargetType());
     }
 }

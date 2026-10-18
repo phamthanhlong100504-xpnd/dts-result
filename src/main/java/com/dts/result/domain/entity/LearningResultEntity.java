@@ -51,6 +51,23 @@ public class LearningResultEntity {
     @Column(name = "attempt_no", nullable = false)
     private Integer attemptNo;
 
+    @Column(name = "activity_type", length = 30)
+    private String activityType;
+    @Column(name = "display_title", length = 200)
+    private String displayTitle;
+    @Column(name = "license_class", length = 10)
+    private String licenseClass;
+    @Column(name = "correct_count")
+    private Integer correctCount;
+    @Column(name = "question_count")
+    private Integer questionCount;
+    @Column(name = "result_available")
+    private Boolean resultAvailable;
+    @Column(name = "review_available")
+    private Boolean reviewAvailable;
+    @Column(name = "event_version")
+    private Integer eventVersion;
+
     @Column(name = "score", columnDefinition = "numeric")
     private BigDecimal score;
 

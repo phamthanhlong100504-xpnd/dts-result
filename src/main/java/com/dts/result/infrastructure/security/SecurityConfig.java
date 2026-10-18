@@ -21,10 +21,15 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
                 .csrf(AbstractHttpConfigurer::disable)
+                .exceptionHandling(errors -> errors.authenticationEntryPoint((request,response,failure) -> {
+                    response.setStatus(401); response.setContentType("application/json");
+                    response.getWriter().write("{\"code\":\"RES-401-001\",\"message\":\"Authentication required\"}");
+                }))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/internal/**").permitAll()
                         .requestMatchers("/v1/results/me/**").authenticated()
+                        .requestMatchers("/v1/leaderboards", "/v1/leaderboards/**").authenticated()
                         .anyRequest().permitAll()
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);

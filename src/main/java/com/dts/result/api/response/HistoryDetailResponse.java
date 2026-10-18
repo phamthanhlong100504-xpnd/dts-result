@@ -12,6 +12,17 @@ import java.util.UUID;
 @Builder
 public class HistoryDetailResponse {
     private UUID id;
+    private String sourceType;
+    private UUID sourceId;
+    private String activityType;
+    private String displayTitle;
+    private String licenseClass;
+    private Integer correctCount;
+    private Integer questionCount;
+    private Boolean resultAvailable;
+    private Boolean reviewAvailable;
+    private String reasonCode;
+    private SourceResultResponse sourceResult;
     private String targetType;
     private UUID targetId;
     private Integer attemptNo;

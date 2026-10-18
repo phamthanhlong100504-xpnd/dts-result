@@ -26,6 +26,8 @@ class LearningResultServiceTest {
     @Mock private LearningResultRepository learningResultRepository;
     @Mock private LearningSummaryService learningSummaryService;
     @Mock private LearningResultMapper resultMapper;
+    @Mock private ResultWriteLock writeLock;
+    @Mock private ExamHistoryProjection examProjection;
 
     @InjectMocks private LearningResultService learningResultService;
 
@@ -61,25 +63,25 @@ class LearningResultServiceTest {
     @Test
     @DisplayName("processLearningResult - Idempotency Check Failed (Already processed)")
     void processLearningResult_IdempotencyFailed_AlreadyProcessed() {
-        when(learningResultRepository.existsBySourceIdAndSourceType(validEvent.getSourceId(), validEvent.getSourceType())).thenReturn(true);
+        LearningResultEntity previous=new LearningResultEntity();previous.setUserId(validEvent.getUserId());
+        when(learningResultRepository.findBySourceIdAndSourceType(validEvent.getSourceId(), validEvent.getSourceType())).thenReturn(java.util.Optional.of(previous));
         learningResultService.processLearningResult(validEvent);
-        verify(learningResultRepository, never()).save(any());
+        verify(learningResultRepository, never()).saveAndFlush(any());
         verify(learningSummaryService, never()).updateProjection(any(), anyString());
     }
 
     @Test
     @DisplayName("processLearningResult - Happy Case")
     void processLearningResult_HappyCase() {
-        when(learningResultRepository.existsBySourceIdAndSourceType(validEvent.getSourceId(), validEvent.getSourceType())).thenReturn(false);
         when(learningResultRepository.countByUserIdAndTargetIdAndTargetType(validEvent.getUserId(), validEvent.getTargetId(), validEvent.getTargetType())).thenReturn(0);
         
         LearningResultEntity entity = new LearningResultEntity();
         when(resultMapper.toEntity(validEvent, 1)).thenReturn(entity);
-        when(learningResultRepository.save(entity)).thenReturn(entity);
+        when(learningResultRepository.saveAndFlush(entity)).thenReturn(entity);
 
         learningResultService.processLearningResult(validEvent);
 
-        verify(learningResultRepository, times(1)).save(entity);
+        verify(learningResultRepository, times(1)).saveAndFlush(entity);
         verify(learningSummaryService, times(1)).updateProjection(entity, "PASS");
     }
 }

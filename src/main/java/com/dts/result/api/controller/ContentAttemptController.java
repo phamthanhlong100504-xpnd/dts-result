@@ -94,20 +94,24 @@ public class ContentAttemptController {
     @GetMapping("/{id}")
     public ResponseEntity<AttemptDetailResponse> getAttemptDetail(
             @RequestHeader("X-Tenant-Id") UUID tenantId,
+            @RequestHeader("X-User-Id") UUID callerUserId,
+            @RequestHeader(value = "X-User-Roles", required = false) String callerRoles,
             @PathVariable("id") UUID id
     ) {
-        AttemptDetailResponse response = getAttemptDetailService.getAttemptDetail(tenantId, id);
+        AttemptDetailResponse response = getAttemptDetailService.getAttemptDetail(tenantId, callerUserId, callerRoles, id);
         return ResponseEntity.ok(response);
     }
 
     @GetMapping
     public ResponseEntity<PageResponse<AttemptSummaryResponse>> listAttempts(
             @RequestHeader("X-Tenant-Id") UUID tenantId,
+            @RequestHeader("X-User-Id") UUID callerUserId,
+            @RequestHeader(value = "X-User-Roles", required = false) String callerRoles,
             @RequestParam("userId") UUID userId,
             @RequestParam(value = "page", defaultValue = "1") int page,
             @RequestParam(value = "size", defaultValue = "20") int size
     ) {
-        PageResponse<AttemptSummaryResponse> response = listAttemptService.listAttempts(tenantId, userId, page, size);
+        PageResponse<AttemptSummaryResponse> response = listAttemptService.listAttempts(tenantId, callerUserId, callerRoles, userId, page, size);
         return ResponseEntity.ok(response);
     }
 }

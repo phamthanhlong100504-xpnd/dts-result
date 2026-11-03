@@ -20,20 +20,24 @@ public class CriteriaResultController {
     @GetMapping
     public ResponseEntity<List<CriteriaResultResponse>> getUserCriteriaResults(
             @RequestHeader("X-Tenant-Id") UUID tenantId,
+            @RequestHeader("X-User-Id") UUID callerUserId,
+            @RequestHeader(value = "X-User-Roles", required = false) String callerRoles,
             @PathVariable("userId") UUID userId
     ) {
-        List<CriteriaResultResponse> response = criteriaResultService.getUserCriteriaResults(tenantId, userId);
+        List<CriteriaResultResponse> response = criteriaResultService.getUserCriteriaResults(tenantId, callerUserId, callerRoles, userId);
         return ResponseEntity.ok(response);
     }
 
     @PostMapping("/evaluate")
     public ResponseEntity<List<CriteriaResultResponse>> evaluateCriteriaResults(
             @RequestHeader("X-Tenant-Id") UUID tenantId,
+            @RequestHeader("X-User-Id") UUID callerUserId,
+            @RequestHeader(value = "X-User-Roles", required = false) String callerRoles,
             @PathVariable("userId") UUID userId,
             @RequestBody(required = false) EvaluateCriteriaRequest request
     ) {
         EvaluateCriteriaRequest req = request != null ? request : new EvaluateCriteriaRequest(null, "MANUAL");
-        List<CriteriaResultResponse> response = criteriaResultService.evaluateCriteriaResults(tenantId, userId, req);
+        List<CriteriaResultResponse> response = criteriaResultService.evaluateCriteriaResults(tenantId, callerUserId, callerRoles, userId, req);
         return ResponseEntity.ok(response);
     }
 }

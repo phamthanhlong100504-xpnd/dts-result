@@ -21,11 +21,12 @@ public class GetAttemptDetailService {
     private final ObjectMapper objectMapper;
 
     @Transactional(readOnly = true)
-    public AttemptDetailResponse getAttemptDetail(UUID tenantId, UUID attemptId) {
-        log.info("Fetching attempt detail for tenant: {}, attemptId: {}", tenantId, attemptId);
+    public AttemptDetailResponse getAttemptDetail(UUID tenantId, UUID callerUserId, String callerRoles, UUID attemptId) {
+        log.info("Fetching attempt detail for tenant: {}, attemptId: {}, caller: {}", tenantId, attemptId, callerUserId);
 
         UserContentAttemptEntity attempt = attemptRepository.findByTenantIdAndId(tenantId, attemptId)
                 .orElseThrow(() -> new ResourceNotFoundException("Attempt not found with ID: " + attemptId));
+        SecurityUtils.validateOwnershipOrAdmin(callerUserId, callerRoles, attempt.getUserId());
 
         Object parsedAnswers = parseJson(attempt.getAnswers());
         Object parsedProctoring = parseJson(attempt.getProctoringData());

@@ -32,11 +32,13 @@ public class TrackingEventController {
     @GetMapping
     public ResponseEntity<PageResponse<TrackingEventResponse>> listTrackingEvents(
             @RequestHeader("X-Tenant-Id") UUID tenantId,
+            @RequestHeader("X-User-Id") UUID callerUserId,
+            @RequestHeader(value = "X-User-Roles", required = false) String callerRoles,
             @RequestParam("userId") UUID userId,
             @RequestParam(value = "page", defaultValue = "1") int page,
             @RequestParam(value = "size", defaultValue = "20") int size
     ) {
-        PageResponse<TrackingEventResponse> response = trackingEventService.listTrackingEvents(tenantId, userId, page, size);
+        PageResponse<TrackingEventResponse> response = trackingEventService.listTrackingEvents(tenantId, callerUserId, callerRoles, userId, page, size);
         return ResponseEntity.ok(response);
     }
 }

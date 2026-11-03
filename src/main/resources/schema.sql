@@ -1,160 +1,75 @@
 -- =============================================================================
 -- Master Schema File: dts-result (Result & Tracking Service)
--- Description: Tạo đầy đủ 11 bảng cơ sở dữ liệu cho dts-result theo đúng thứ tự phụ thuộc
+-- Description: Tạo đầy đủ các bảng cơ sở dữ liệu cho dts-result theo schema mới nhất
 -- Engine: PostgreSQL / YugabyteDB
 -- =============================================================================
 
 -- -----------------------------------------------------------------------------
--- 1. Table: criterias
+-- 1. Table: learning_results (Kết quả chi tiết từng lần nộp/phiên học)
 -- -----------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS criterias (
-    id          UUID        NOT NULL,
-    tenant_id   UUID        NOT NULL,
-    created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
-    created_by  UUID,
-    updated_by  UUID,
-    deleted_at  TIMESTAMPTZ,
-    parent_id   UUID,
-    require_all BOOL,
-    pass_score  NUMERIC(8,2),
-    grading     JSONB,
-    ref_type     VARCHAR(50),
-    ref_ids      UUID[]      DEFAULT '{}',
-    metric_field VARCHAR(30) NOT NULL DEFAULT 'percent',
-    aggregate    VARCHAR(20),
-    min_count   SMALLINT,
-    operator    VARCHAR(10),
-    threshold   NUMERIC(12,2),
-    weight      NUMERIC(6,2) DEFAULT 1,
-    title       TEXT,
-    CONSTRAINT pk_criterias PRIMARY KEY (id)
-);
-
--- -----------------------------------------------------------------------------
--- 2. Table: completion_criterias
--- -----------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS completion_criterias (
-    id           UUID         NOT NULL,
-    tenant_id    UUID         NOT NULL,
-    version      BIGINT       NOT NULL DEFAULT 1,
-    created_at   TIMESTAMPTZ  NOT NULL DEFAULT now(),
-    updated_at   TIMESTAMPTZ  NOT NULL DEFAULT now(),
-    created_by   UUID,
-    updated_by   UUID,
-    deleted_at   TIMESTAMPTZ,
-    content_id   UUID         NOT NULL,
-    title        TEXT,
-    combine_op   VARCHAR(10)  NOT NULL DEFAULT 'AND',
-    criteria_ids UUID[]       NOT NULL DEFAULT '{}',
-    grading      JSONB        NOT NULL DEFAULT '{}'::jsonb,
-    metadata     JSONB        NOT NULL DEFAULT '{}'::jsonb,
-    CONSTRAINT pk_completion_criterias PRIMARY KEY (id)
-);
-
--- -----------------------------------------------------------------------------
--- 3. Table: user_criteria_results
--- -----------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS user_criteria_results (
-    id          UUID        NOT NULL,
-    tenant_id   UUID        NOT NULL,
-    criteria_id UUID        NOT NULL,
-    user_id     UUID        NOT NULL,
-    seq_no      SMALLINT    NOT NULL DEFAULT 1,
-    is_latest   BOOL        NOT NULL DEFAULT true,
-    status      TEXT        NOT NULL DEFAULT 'IN_PROGRESS',
-    total_score NUMERIC(8,2),
-    is_passed   BOOL,
-    grade_label TEXT,
-    items       JSONB       NOT NULL DEFAULT '[]',
-    grader_id   UUID,
-    grader_note TEXT,
-    graded_at   TIMESTAMPTZ,
-    evaluated_at TIMESTAMPTZ,
-    created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
-    CONSTRAINT pk_user_criteria_results PRIMARY KEY (id),
-    CONSTRAINT uq_ucr_seq UNIQUE (tenant_id, criteria_id, user_id, seq_no)
-);
-
--- -----------------------------------------------------------------------------
--- 4. Table: user_content_results
--- -----------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS user_content_results (
-    id                 UUID        NOT NULL,
-    tenant_id          UUID        NOT NULL,
+CREATE TABLE IF NOT EXISTS learning_results (
+    id                 UUID        NOT NULL DEFAULT gen_random_uuid(),
     user_id            UUID        NOT NULL,
-    content_id         UUID        NOT NULL,
-    content_type       TEXT        NOT NULL,
-    content_version_id UUID,
-    parent_node_id     UUID,
-    content_code       TEXT        NOT NULL,
-    status             TEXT        NOT NULL DEFAULT 'NOT_COMPLETED',
-    percent            INT4        NOT NULL DEFAULT 0,
-    total_learn_sec    INT4        NOT NULL DEFAULT 0,
-    learn_count        INT4        NOT NULL DEFAULT 0,
-    attempt_count      INT4        NOT NULL DEFAULT 0,
-    best_score         NUMERIC(10,2),
-    last_score         NUMERIC(10,2),
-    last_score_at      TIMESTAMPTZ,
-    last_attempt_id    UUID,
-    answers            JSONB,
-    metadata           JSONB,
-    started_at         TIMESTAMPTZ,
-    last_activity_at   TIMESTAMPTZ,
+    source_id          UUID        NOT NULL,
+    target_id          UUID        NOT NULL,
+    source_type        VARCHAR(30) NOT NULL,
+    target_type        VARCHAR(30) NOT NULL,
+    attempt_no         INT4        NOT NULL,
+    score              NUMERIC(10,2),
+    max_score          NUMERIC(10,2),
+    progress           NUMERIC(5,2) NOT NULL DEFAULT 0,
+    duration_seconds   INT4        NOT NULL DEFAULT 0,
+    result             VARCHAR(30) NOT NULL,
+    started_at         TIMESTAMPTZ NOT NULL,
     completed_at       TIMESTAMPTZ,
+    result_snapshot    JSONB,
+    metadata           JSONB,
     created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at         TIMESTAMPTZ,
-    CONSTRAINT pk_user_content_results PRIMARY KEY (id)
+    updated_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT pk_learning_results PRIMARY KEY (id),
+    CONSTRAINT ck_learning_results_source_type CHECK (source_type IN ('EXAM_SESSION', 'PRACTICE_SESSION', 'LESSON_SESSION', 'ASSIGNMENT_SESSION')),
+    CONSTRAINT ck_learning_results_target_type CHECK (target_type IN ('EXAM', 'PRACTICE_SET', 'CHAPTER', 'LESSON', 'LEARNING_PROGRAM')),
+    CONSTRAINT ck_learning_results_result CHECK (result IN ('PASSED', 'FAILED', 'COMPLETED', 'ABANDONED', 'EXPIRED'))
 );
 
--- -----------------------------------------------------------------------------
--- 5. Table: user_content_attempts
--- -----------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS user_content_attempts (
-    id                  UUID          NOT NULL DEFAULT gen_random_uuid(),
-    tenant_id           UUID          NOT NULL,
-    user_id             UUID          NOT NULL,
-    node_id             UUID,
-    content_id          UUID          NOT NULL,
-    content_type        TEXT          NOT NULL,
-    seq_no              INT4          NOT NULL,
-    started_at          TIMESTAMPTZ   NOT NULL,
-    ended_at            TIMESTAMPTZ,
-    status              TEXT          NOT NULL DEFAULT 'draft',
-    device_kind         TEXT,
-    duration_sec        INT4          NOT NULL DEFAULT 0,
-    heartbeat_at        TIMESTAMPTZ,
-    ip_address          INET,
-    session_id          UUID,
-    ended_reason        TEXT,
-    content_version_id  UUID,
-    source_service      TEXT,
-    source_ref          TEXT,
-    metadata            JSONB,
-    created_at          TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
-    updated_at          TIMESTAMPTZ   NOT NULL DEFAULT NOW(),
-    submitted_at        TIMESTAMPTZ,
-    auto_submitted_at   TIMESTAMPTZ,
-    graded_at           TIMESTAMPTZ,
-    grading_status      TEXT          NOT NULL DEFAULT 'pending',
-    score               NUMERIC(10,2),
-    max_score           NUMERIC(10,2),
-    penalty_score       NUMERIC(10,2) NOT NULL DEFAULT 0,
-    final_score         NUMERIC(10,2),
-    is_passed           BOOL,
-    is_late             BOOL          NOT NULL DEFAULT false,
-    grader_id           UUID,
-    time_taken_sec      INT4          NOT NULL DEFAULT 0,
-    hint_used_count     INT4          NOT NULL DEFAULT 0,
-    answers             JSONB,
-    proctoring_data     JSONB,
-    CONSTRAINT pk_user_content_attempts PRIMARY KEY (id),
-    CONSTRAINT uq_uca_user_content_seq UNIQUE (tenant_id, user_id, content_id, seq_no)
-);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_learning_results_source ON learning_results (source_id, source_type);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_learning_results_user_target_attempt ON learning_results (user_id, target_type, target_id, attempt_no);
+CREATE INDEX IF NOT EXISTS ix_learning_results_user_id ON learning_results (user_id);
 
 -- -----------------------------------------------------------------------------
--- 6. Table: tracking_events
+-- 2. Table: learning_summaries (Tiến độ tổng hợp của người dùng)
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS learning_summaries (
+    id                     UUID        NOT NULL DEFAULT gen_random_uuid(),
+    user_id                UUID        NOT NULL,
+    target_id              UUID        NOT NULL,
+    last_result_id         UUID,
+    target_type            VARCHAR(30) NOT NULL,
+    attempt_count          INT4        NOT NULL DEFAULT 0,
+    completion_count       INT4        NOT NULL DEFAULT 0,
+    best_score             NUMERIC(10,2),
+    latest_score           NUMERIC(10,2),
+    average_score          NUMERIC(10,2),
+    progress               NUMERIC(5,2) NOT NULL DEFAULT 0,
+    total_duration_seconds INT4        NOT NULL DEFAULT 0,
+    status                 VARCHAR(30) NOT NULL DEFAULT 'NOT_STARTED',
+    last_activity_at       TIMESTAMPTZ,
+    completed_at           TIMESTAMPTZ,
+    summary_snapshot       JSONB,
+    metadata               JSONB,
+    created_at             TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at             TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT pk_learning_summaries PRIMARY KEY (id),
+    CONSTRAINT ck_learning_summaries_target_type CHECK (target_type IN ('EXAM', 'PRACTICE_SET', 'CHAPTER', 'LESSON', 'LEARNING_PROGRAM')),
+    CONSTRAINT ck_learning_summaries_status CHECK (status IN ('NOT_STARTED', 'IN_PROGRESS', 'COMPLETED'))
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_learning_summaries_user_target ON learning_summaries (user_id, target_type, target_id);
+CREATE INDEX IF NOT EXISTS ix_learning_summaries_user_id ON learning_summaries (user_id);
+CREATE INDEX IF NOT EXISTS ix_learning_summaries_status ON learning_summaries (status);
+
+-- -----------------------------------------------------------------------------
+-- 3. Table: tracking_events
 -- -----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS tracking_events (
     id               UUID        NOT NULL DEFAULT gen_random_uuid(),
@@ -181,7 +96,7 @@ CREATE TABLE IF NOT EXISTS tracking_events (
 );
 
 -- -----------------------------------------------------------------------------
--- 7. Table: learning_logs
+-- 4. Table: learning_logs
 -- -----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS learning_logs (
     id                 UUID        NOT NULL DEFAULT gen_random_uuid(),
@@ -203,7 +118,7 @@ CREATE TABLE IF NOT EXISTS learning_logs (
 );
 
 -- -----------------------------------------------------------------------------
--- 8. Table: content_bookmarks
+-- 5. Table: content_bookmarks
 -- -----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS content_bookmarks (
     id           UUID        NOT NULL DEFAULT gen_random_uuid(),
@@ -219,7 +134,7 @@ CREATE TABLE IF NOT EXISTS content_bookmarks (
 );
 
 -- -----------------------------------------------------------------------------
--- 9. Table: lesson_notes
+-- 6. Table: lesson_notes
 -- -----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS lesson_notes (
     id                  UUID        NOT NULL DEFAULT gen_random_uuid(),
@@ -237,7 +152,7 @@ CREATE TABLE IF NOT EXISTS lesson_notes (
 );
 
 -- -----------------------------------------------------------------------------
--- 10. Table: content_reactions
+-- 7. Table: content_reactions
 -- -----------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS content_reactions (
     id            UUID        NOT NULL DEFAULT gen_random_uuid(),
@@ -250,17 +165,4 @@ CREATE TABLE IF NOT EXISTS content_reactions (
     updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     CONSTRAINT pk_content_reactions PRIMARY KEY (id),
     CONSTRAINT uq_content_reactions_user_content UNIQUE (tenant_id, user_id, content_id)
-);
-
--- -----------------------------------------------------------------------------
--- 11. Table: content_node_children
--- -----------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS content_node_children (
-    id             UUID        NOT NULL DEFAULT gen_random_uuid(),
-    tenant_id      UUID        NOT NULL,
-    parent_node_id UUID        NOT NULL,
-    child_node_id  UUID        NOT NULL,
-    seq_order      INT4        NOT NULL DEFAULT 1,
-    created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT pk_content_node_children PRIMARY KEY (id)
 );

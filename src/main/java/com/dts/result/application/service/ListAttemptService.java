@@ -24,8 +24,9 @@ public class ListAttemptService {
     private final UserContentAttemptRepository attemptRepository;
 
     @Transactional(readOnly = true)
-    public PageResponse<AttemptSummaryResponse> listAttempts(UUID tenantId, UUID userId, int page, int size) {
-        log.info("Fetching attempts list for tenant: {}, user: {}, page: {}, size: {}", tenantId, userId, page, size);
+    public PageResponse<AttemptSummaryResponse> listAttempts(UUID tenantId, UUID callerUserId, String callerRoles, UUID userId, int page, int size) {
+        log.info("Fetching attempts list for tenant: {}, user: {}, caller: {}, page: {}, size: {}", tenantId, userId, callerUserId, page, size);
+        SecurityUtils.validateOwnershipOrAdmin(callerUserId, callerRoles, userId);
 
         int pageIndex = Math.max(0, page - 1);
         Pageable pageable = PageRequest.of(pageIndex, size, Sort.by(Sort.Direction.DESC, "createdAt"));

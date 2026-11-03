@@ -32,11 +32,13 @@ public class LearningLogController {
     @GetMapping
     public ResponseEntity<PageResponse<LearningLogResponse>> listLearningLogs(
             @RequestHeader("X-Tenant-Id") UUID tenantId,
+            @RequestHeader("X-User-Id") UUID callerUserId,
+            @RequestHeader(value = "X-User-Roles", required = false) String callerRoles,
             @RequestParam("userId") UUID userId,
             @RequestParam(value = "page", defaultValue = "1") int page,
             @RequestParam(value = "size", defaultValue = "20") int size
     ) {
-        PageResponse<LearningLogResponse> response = learningLogService.listLearningLogs(tenantId, userId, page, size);
+        PageResponse<LearningLogResponse> response = learningLogService.listLearningLogs(tenantId, callerUserId, callerRoles, userId, page, size);
         return ResponseEntity.ok(response);
     }
 }

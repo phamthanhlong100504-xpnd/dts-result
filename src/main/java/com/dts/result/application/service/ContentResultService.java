@@ -22,8 +22,9 @@ public class ContentResultService {
     private final ObjectMapper objectMapper;
 
     @Transactional(readOnly = true)
-    public List<ContentResultResponse> getUserProgressTree(UUID tenantId, UUID userId) {
-        log.info("Fetching content progress tree for tenant: {}, user: {}", tenantId, userId);
+    public List<ContentResultResponse> getUserProgressTree(UUID tenantId, UUID callerUserId, String callerRoles, UUID userId) {
+        log.info("Fetching content progress tree for tenant: {}, user: {}, caller: {}", tenantId, userId, callerUserId);
+        SecurityUtils.validateOwnershipOrAdmin(callerUserId, callerRoles, userId);
         return resultRepository.findAll().stream()
                 .filter(r -> tenantId.equals(r.getTenantId()) && userId.equals(r.getUserId()))
                 .map(this::mapToResponse)
@@ -31,18 +32,20 @@ public class ContentResultService {
     }
 
     @Transactional(readOnly = true)
-    public ContentResultResponse getContentResultDetail(UUID tenantId, UUID id) {
-        log.info("Fetching content result detail for tenant: {}, id: {}", tenantId, id);
+    public ContentResultResponse getContentResultDetail(UUID tenantId, UUID callerUserId, String callerRoles, UUID id) {
+        log.info("Fetching content result detail for tenant: {}, id: {}, caller: {}", tenantId, id, callerUserId);
         UserContentResultEntity entity = resultRepository.findByTenantIdAndId(tenantId, id)
                 .orElseThrow(() -> new ResourceNotFoundException("Content result not found with ID: " + id));
+        SecurityUtils.validateOwnershipOrAdmin(callerUserId, callerRoles, entity.getUserId());
         return mapToResponse(entity);
     }
 
     @Transactional
-    public ContentResultResponse recalculateContentResult(UUID tenantId, UUID id) {
-        log.info("Recalculating content result for tenant: {}, id: {}", tenantId, id);
+    public ContentResultResponse recalculateContentResult(UUID tenantId, UUID callerUserId, String callerRoles, UUID id) {
+        log.info("Recalculating content result for tenant: {}, id: {}, caller: {}", tenantId, id, callerUserId);
         UserContentResultEntity entity = resultRepository.findByTenantIdAndId(tenantId, id)
                 .orElseThrow(() -> new ResourceNotFoundException("Content result not found with ID: " + id));
+        SecurityUtils.validateOwnershipOrAdmin(callerUserId, callerRoles, entity.getUserId());
 
         // Logic recalculate rollup
         if (entity.getAttemptCount() > 0) {

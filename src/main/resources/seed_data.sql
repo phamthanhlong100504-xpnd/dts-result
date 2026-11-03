@@ -5,161 +5,87 @@
 -- =============================================================================
 
 -- -----------------------------------------------------------------------------
--- 1. Seed data: user_content_results (Tiến độ học tập dạng cây)
+-- 1. Seed data: learning_results (Kết quả lượt nộp/học tập)
 -- -----------------------------------------------------------------------------
-INSERT INTO user_content_results (
+INSERT INTO learning_results (
     id,
-    tenant_id,
     user_id,
-    content_id,
-    content_type,
-    content_version_id,
-    parent_node_id,
-    content_code,
-    status,
-    percent,
-    total_learn_sec,
-    learn_count,
-    attempt_count,
-    best_score,
-    last_score,
-    last_score_at,
-    last_attempt_id,
-    answers,
-    metadata,
-    started_at,
-    last_activity_at,
-    completed_at
-) VALUES (
-    '0190ce1a-0000-7000-8000-000000000001'::uuid,
-    '0190ce1a-0000-7000-8000-000000000000'::uuid, -- tenant_id
-    '0190ce1a-0000-7000-8000-000000000099'::uuid, -- user_id (learner)
-    '0190ce1a-2000-7000-8000-000000000001'::uuid, -- content_id
-    'coursewares',
-    '0190ce1a-3000-7000-8000-000000000001'::uuid,
-    NULL, -- parent_node_id (gốc)
-    '0190ce1a-2000-7000-8000-000000000001',
-    'COMPLETED',
-    100,
-    3600,
-    5,
-    2,
-    95.00,
-    95.00,
-    NOW() - INTERVAL '1 hour',
-    '0190ce1a-4000-7000-8000-000000000001'::uuid,
-    NULL,
-    '{"platform": "web", "browser": "Chrome"}'::jsonb,
-    NOW() - INTERVAL '1 day',
-    NOW() - INTERVAL '1 hour',
-    NOW() - INTERVAL '1 hour'
-) ON CONFLICT (id) DO NOTHING;
-
-INSERT INTO user_content_results (
-    id,
-    tenant_id,
-    user_id,
-    content_id,
-    content_type,
-    content_version_id,
-    parent_node_id,
-    content_code,
-    status,
-    percent,
-    total_learn_sec,
-    learn_count,
-    attempt_count,
-    best_score,
-    last_score,
-    last_score_at,
-    last_attempt_id,
-    answers,
-    metadata,
-    started_at,
-    last_activity_at,
-    completed_at
-) VALUES (
-    '0190ce1a-0000-7000-8000-000000000002'::uuid,
-    '0190ce1a-0000-7000-8000-000000000000'::uuid,
-    '0190ce1a-0000-7000-8000-000000000099'::uuid,
-    '0190ce1a-2000-7000-8000-000000000002'::uuid,
-    'lessons',
-    '0190ce1a-3000-7000-8000-000000000002'::uuid,
-    '0190ce1a-0000-7000-8000-000000000001'::uuid, -- parent_node_id
-    '0190ce1a-2000-7000-8000-000000000001:0190ce1a-2000-7000-8000-000000000002',
-    'NOT_COMPLETED',
-    50,
-    1800,
-    2,
-    1,
-    70.00,
-    70.00,
-    NOW() - INTERVAL '30 minutes',
-    '0190ce1a-4000-7000-8000-000000000002'::uuid,
-    NULL,
-    '{}'::jsonb,
-    NOW() - INTERVAL '12 hours',
-    NOW() - INTERVAL '30 minutes',
-    NULL
-) ON CONFLICT (id) DO NOTHING;
-
--- -----------------------------------------------------------------------------
--- 2. Seed data: user_content_attempts (Lịch sử nộp bài tập / bài thi)
--- -----------------------------------------------------------------------------
-INSERT INTO user_content_attempts (
-    id,
-    tenant_id,
-    user_id,
-    node_id,
-    content_id,
-    content_type,
-    seq_no,
-    started_at,
-    submitted_at,
-    ended_at,
-    status,
-    grading_status,
-    device_kind,
-    duration_sec,
-    time_taken_sec,
+    source_id,
+    target_id,
+    source_type,
+    target_type,
+    attempt_no,
     score,
     max_score,
-    penalty_score,
-    final_score,
-    is_passed,
-    is_late,
-    hint_used_count,
-    answers,
-    proctoring_data
+    progress,
+    duration_seconds,
+    result,
+    started_at,
+    completed_at,
+    result_snapshot,
+    metadata
 ) VALUES (
     '0190ce1a-4000-7000-8000-000000000001'::uuid,
-    '0190ce1a-0000-7000-8000-000000000000'::uuid,
-    '0190ce1a-0000-7000-8000-000000000099'::uuid,
-    '0190ce1a-0000-7000-8000-000000000001'::uuid,
-    '0190ce1a-2000-7000-8000-000000000001'::uuid,
+    '0190ce1a-0000-7000-8000-000000000099'::uuid, -- user_id
+    '0190ce1a-7777-7000-8000-000000000001'::uuid, -- source_id
+    '0190ce1a-2000-7000-8000-000000000001'::uuid, -- target_id
+    'EXAM_SESSION',
     'EXAM',
     1,
-    NOW() - INTERVAL '2 hours',
-    NOW() - INTERVAL '1 hour',
-    NOW() - INTERVAL '1 hour',
-    'submitted',
-    'graded',
-    'desktop',
-    3600,
-    3000,
     95.00,
     100.00,
-    0.00,
-    95.00,
-    TRUE,
-    FALSE,
-    0,
-    '[{"question_id": "0190ce1a-5000-7000-8000-000000000001", "is_correct": true, "score": 95.00}]'::jsonb,
-    '{"tab_switch_count": 0, "webcam_enabled": true}'::jsonb
+    100.00,
+    3000,
+    'PASSED',
+    NOW() - INTERVAL '2 hours',
+    NOW() - INTERVAL '1 hour',
+    '{"correctQuestions": 19, "wrongQuestions": 1, "passingScore": 80}'::jsonb,
+    '{"tabSwitchCount": 0}'::jsonb
 ) ON CONFLICT (id) DO NOTHING;
 
 -- -----------------------------------------------------------------------------
--- 3. Seed data: tracking_events (Sự kiện vòng đời học tập)
+-- 2. Seed data: learning_summaries (Tiến độ tổng hợp)
+-- -----------------------------------------------------------------------------
+INSERT INTO learning_summaries (
+    id,
+    user_id,
+    target_id,
+    last_result_id,
+    target_type,
+    attempt_count,
+    completion_count,
+    best_score,
+    latest_score,
+    average_score,
+    progress,
+    total_duration_seconds,
+    status,
+    last_activity_at,
+    completed_at,
+    summary_snapshot,
+    metadata
+) VALUES (
+    '0190ce1a-0000-7000-8000-000000000001'::uuid,
+    '0190ce1a-0000-7000-8000-000000000099'::uuid,
+    '0190ce1a-2000-7000-8000-000000000001'::uuid,
+    '0190ce1a-4000-7000-8000-000000000001'::uuid,
+    'EXAM',
+    1,
+    1,
+    95.00,
+    95.00,
+    95.00,
+    100.00,
+    3000,
+    'COMPLETED',
+    NOW() - INTERVAL '1 hour',
+    NOW() - INTERVAL '1 hour',
+    '{"passed": true}'::jsonb,
+    '{}'::jsonb
+) ON CONFLICT (id) DO NOTHING;
+
+-- -----------------------------------------------------------------------------
+-- 3. Seed data: tracking_events
 -- -----------------------------------------------------------------------------
 INSERT INTO tracking_events (
     id,
@@ -200,7 +126,7 @@ INSERT INTO tracking_events (
 ) ON CONFLICT (id) DO NOTHING;
 
 -- -----------------------------------------------------------------------------
--- 4. Seed data: learning_logs (Nhật ký học bị động)
+-- 4. Seed data: learning_logs
 -- -----------------------------------------------------------------------------
 INSERT INTO learning_logs (
     id,
@@ -235,7 +161,7 @@ INSERT INTO learning_logs (
 ) ON CONFLICT (id) DO NOTHING;
 
 -- -----------------------------------------------------------------------------
--- 5. Seed data: content_bookmarks (Đánh dấu lưu nội dung)
+-- 5. Seed data: content_bookmarks
 -- -----------------------------------------------------------------------------
 INSERT INTO content_bookmarks (
     id,
@@ -256,7 +182,7 @@ INSERT INTO content_bookmarks (
 ) ON CONFLICT (tenant_id, user_id, content_id) DO NOTHING;
 
 -- -----------------------------------------------------------------------------
--- 6. Seed data: lesson_notes (Ghi chú bài học)
+-- 6. Seed data: lesson_notes
 -- -----------------------------------------------------------------------------
 INSERT INTO lesson_notes (
     id,
@@ -279,7 +205,7 @@ INSERT INTO lesson_notes (
 ) ON CONFLICT (id) DO NOTHING;
 
 -- -----------------------------------------------------------------------------
--- 7. Seed data: content_reactions (Thả cảm xúc bài học)
+-- 7. Seed data: content_reactions
 -- -----------------------------------------------------------------------------
 INSERT INTO content_reactions (
     id,

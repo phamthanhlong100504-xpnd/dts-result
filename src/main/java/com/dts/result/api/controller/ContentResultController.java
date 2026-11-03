@@ -19,27 +19,33 @@ public class ContentResultController {
     @GetMapping("/users/{userId}/content-results")
     public ResponseEntity<List<ContentResultResponse>> getUserProgressTree(
             @RequestHeader("X-Tenant-Id") UUID tenantId,
+            @RequestHeader("X-User-Id") UUID callerUserId,
+            @RequestHeader(value = "X-User-Roles", required = false) String callerRoles,
             @PathVariable("userId") UUID userId
     ) {
-        List<ContentResultResponse> response = contentResultService.getUserProgressTree(tenantId, userId);
+        List<ContentResultResponse> response = contentResultService.getUserProgressTree(tenantId, callerUserId, callerRoles, userId);
         return ResponseEntity.ok(response);
     }
 
     @GetMapping("/content-results/{id}")
     public ResponseEntity<ContentResultResponse> getContentResultDetail(
             @RequestHeader("X-Tenant-Id") UUID tenantId,
+            @RequestHeader("X-User-Id") UUID callerUserId,
+            @RequestHeader(value = "X-User-Roles", required = false) String callerRoles,
             @PathVariable("id") UUID id
     ) {
-        ContentResultResponse response = contentResultService.getContentResultDetail(tenantId, id);
+        ContentResultResponse response = contentResultService.getContentResultDetail(tenantId, callerUserId, callerRoles, id);
         return ResponseEntity.ok(response);
     }
 
     @PutMapping("/content-results/{id}/recalculate")
     public ResponseEntity<ContentResultResponse> recalculateContentResult(
             @RequestHeader("X-Tenant-Id") UUID tenantId,
+            @RequestHeader("X-User-Id") UUID callerUserId,
+            @RequestHeader(value = "X-User-Roles", required = false) String callerRoles,
             @PathVariable("id") UUID id
     ) {
-        ContentResultResponse response = contentResultService.recalculateContentResult(tenantId, id);
+        ContentResultResponse response = contentResultService.recalculateContentResult(tenantId, callerUserId, callerRoles, id);
         return ResponseEntity.ok(response);
     }
 }

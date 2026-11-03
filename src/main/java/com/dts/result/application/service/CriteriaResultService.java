@@ -24,8 +24,9 @@ public class CriteriaResultService {
     private final ObjectMapper objectMapper;
 
     @Transactional(readOnly = true)
-    public List<CriteriaResultResponse> getUserCriteriaResults(UUID tenantId, UUID userId) {
-        log.info("Fetching criteria results for tenant: {}, user: {}", tenantId, userId);
+    public List<CriteriaResultResponse> getUserCriteriaResults(UUID tenantId, UUID callerUserId, String callerRoles, UUID userId) {
+        log.info("Fetching criteria results for tenant: {}, user: {}, caller: {}", tenantId, userId, callerUserId);
+        SecurityUtils.validateOwnershipOrAdmin(callerUserId, callerRoles, userId);
         return criteriaResultRepository.findByTenantIdAndUserIdAndIsLatestTrue(tenantId, userId).stream()
                 .map(this::mapToResponse)
                 .toList();

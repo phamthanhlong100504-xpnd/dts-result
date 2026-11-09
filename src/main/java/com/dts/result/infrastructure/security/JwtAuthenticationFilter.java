@@ -17,6 +17,8 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import javax.crypto.SecretKey;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.List;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import java.util.UUID;
 
 @Component
@@ -27,6 +29,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     @Value("${jwt.issuer:dts-identity-service}")
     private String jwtIssuer;
+
+    private static List<?> listClaim(Object raw) {
+        return raw instanceof List<?> values ? values : List.of();
+    }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
@@ -51,8 +57,19 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 String userIdStr = claims.getSubject();
                 if (userIdStr != null) {
                     UUID userId = UUID.fromString(userIdStr);
+                    // Map only signed Identity-issued claims. A role without its specific grant
+                    // never authorizes Admin reporting. Do not infer permissions from ROLE_ADMIN.
+                    List<SimpleGrantedAuthority> authorities = new ArrayList<>();
+                    for (Object role : listClaim(claims.get("roles"))) {
+                        if (role instanceof String name && name.matches("ROLE_[A-Z0-9_]{1,40}"))
+                            authorities.add(new SimpleGrantedAuthority(name));
+                    }
+                    for (Object permission : listClaim(claims.get("permissions"))) {
+                        if (permission instanceof String name && name.matches("[a-z][a-z0-9-]{0,63}:[a-z][a-z0-9-]{0,40}"))
+                            authorities.add(new SimpleGrantedAuthority("PERM_" + name));
+                    }
                     UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
-                            userId, null, new ArrayList<>());
+                            userId, null, authorities);
                     SecurityContextHolder.getContext().setAuthentication(authentication);
                 }
             } catch (Exception e) {

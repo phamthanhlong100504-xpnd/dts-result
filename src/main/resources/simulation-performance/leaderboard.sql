@@ -1,0 +1,22 @@
+WITH request AS(SELECT ?::uuid who,?::text license,?::timestamptz range_from,?::timestamptz range_to,
+ ?::timestamptz as_of,?::bigint watermark,?::text period,?::integer page_no,?::integer page_size),
+credits AS MATERIALIZED(SELECT c.* FROM request q CROSS JOIN LATERAL dts_combined_exp_credits(q.license,q.range_from,q.range_to,q.watermark)c),
+totals AS(SELECT user_id,SUM(credited_exp)::bigint ranking_score,MAX(credited_at) last_credited_at,
+ COALESCE(SUM(credited_exp)FILTER(WHERE rule_version='EXP_2026_01'),0)::bigint theory_exp,
+ COALESCE(SUM(credited_exp)FILTER(WHERE rule_version='SIMULATION_EXP_V1'),0)::bigint simulation_exp FROM credits GROUP BY user_id),
+ranked AS(SELECT t.*,p.display_name,p.user_id profile_id,ROW_NUMBER() OVER(ORDER BY ranking_score DESC,last_credited_at ASC,t.user_id ASC) position
+ FROM totals t LEFT JOIN leaderboard_public_profiles p ON p.user_id=t.user_id WHERE t.ranking_score>0 AND COALESCE(p.deleted,FALSE)=FALSE),
+page_rows AS(SELECT * FROM ranked ORDER BY position LIMIT(SELECT page_size FROM request)OFFSET(SELECT page_no::bigint*page_size FROM request)),
+fingerprint AS(SELECT md5(COALESCE(string_agg(source_type||':'||source_id||':'||credited_exp||':'||(credited_at AT TIME ZONE 'UTC')::text,',' ORDER BY source_type,source_id),'')) hash FROM credits CROSS JOIN request q WHERE credits.user_id=q.who)
+SELECT jsonb_build_object('licenseClass',q.license,'period',q.period,'performanceMode','COMBINED','ruleVersion','COMBINED_EXP_V1',
+ 'timezone','Asia/Ho_Chi_Minh','from',q.range_from,'to',q.range_to,'asOf',q.as_of,
+ 'expScope',jsonb_build_object('licenseClass',q.license,'from',q.range_from,'to',q.range_to,'asOf',q.as_of,'sourceWatermark',q.watermark,'creditFingerprint',(SELECT hash FROM fingerprint),'ruleVersion','COMBINED_EXP_V1'),
+ 'currentUser',jsonb_build_object('userId',q.who,'rank',(SELECT position FROM ranked WHERE user_id=q.who),
+  'rankingScore',COALESCE((SELECT ranking_score FROM totals WHERE user_id=q.who),0),'theoryExp',COALESCE((SELECT theory_exp FROM totals WHERE user_id=q.who),0),
+  'simulationExp',COALESCE((SELECT simulation_exp FROM totals WHERE user_id=q.who),0),'lastCreditedAt',(SELECT last_credited_at FROM totals WHERE user_id=q.who),
+  'displayName',(SELECT display_name FROM leaderboard_public_profiles WHERE user_id=q.who AND NOT deleted),'avatarUrl',NULL,
+  'profileStatus',COALESCE((SELECT CASE WHEN deleted OR display_name IS NULL THEN 'UNAVAILABLE' ELSE 'AVAILABLE' END FROM leaderboard_public_profiles WHERE user_id=q.who),'PENDING')),
+ 'items',COALESCE((SELECT jsonb_agg(jsonb_build_object('userId',p.user_id,'rank',p.position,'rankingScore',p.ranking_score,
+  'theoryExp',p.theory_exp,'simulationExp',p.simulation_exp,'lastCreditedAt',p.last_credited_at,'displayName',p.display_name,'avatarUrl',NULL,
+  'profileStatus',CASE WHEN p.profile_id IS NULL THEN 'PENDING' WHEN p.display_name IS NULL THEN 'UNAVAILABLE' ELSE 'AVAILABLE' END)ORDER BY p.position)FROM page_rows p),'[]'::jsonb),
+ 'page',q.page_no,'size',q.page_size,'totalParticipants',(SELECT COUNT(*) FROM ranked),'totalPages',((SELECT COUNT(*) FROM ranked)+q.page_size-1)/q.page_size)::text FROM request q

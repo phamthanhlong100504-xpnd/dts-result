@@ -1,8 +1,7 @@
 name: Fetch Logs
 
 on:
-  push:
-    branches: [main]
+  workflow_dispatch:
 
 jobs:
   fetch-logs:
@@ -14,4 +13,4 @@ jobs:
           username: ${{ secrets.VPS_USER }}
           password: ${{ secrets.VPS_PASSWORD }}
           script: |
-            docker logs --tail 500 dts-result
+            docker logs --tail 500 dts-result 2>&1 || echo "Container dts-result is not running or does not exist yet."
